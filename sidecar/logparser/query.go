@@ -65,6 +65,34 @@ func LogFilesForRange(logDir string, start, end time.Time) []string {
 	return files
 }
 
+// ProcessFilesStreaming parses log files in the date range one at a time,
+// calling fn for each entry. Entries are not retained after fn returns,
+// allowing GC to reclaim memory between files.
+func ProcessFilesStreaming(logDir string, start, end time.Time, fn func(*LogEntry)) (int, error) {
+	files := LogFilesForRange(logDir, start, end)
+	for _, path := range files {
+		f, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		scanner := bufio.NewScanner(f)
+		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "" {
+				continue
+			}
+			entry, err := ParseLine(line)
+			if err != nil {
+				continue
+			}
+			fn(entry)
+		}
+		f.Close()
+	}
+	return len(files), nil
+}
+
 // LoadEntriesForRange parses all log files in the date range and returns entries + file count.
 func LoadEntriesForRange(logDir string, start, end time.Time) ([]*LogEntry, int, error) {
 	files := LogFilesForRange(logDir, start, end)

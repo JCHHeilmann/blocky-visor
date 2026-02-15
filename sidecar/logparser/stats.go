@@ -25,11 +25,11 @@ type Period struct {
 }
 
 type Summary struct {
-	TotalQueries  int     `json:"total_queries"`
-	BlockedQueries int    `json:"blocked_queries"`
-	CachedQueries  int    `json:"cached_queries"`
-	UniqueDomains  int    `json:"unique_domains"`
-	UniqueClients  int    `json:"unique_clients"`
+	TotalQueries   int     `json:"total_queries"`
+	BlockedQueries int     `json:"blocked_queries"`
+	CachedQueries  int     `json:"cached_queries"`
+	UniqueDomains  int     `json:"unique_domains"`
+	UniqueClients  int     `json:"unique_clients"`
 	AvgDurationMs  float64 `json:"avg_duration_ms"`
 	P95DurationMs  float64 `json:"p95_duration_ms"`
 }
@@ -66,108 +66,144 @@ type TimelineBucket struct {
 	Cached    int       `json:"cached"`
 }
 
-// ComputeStats aggregates a slice of LogEntry into stats.
-func ComputeStats(entries []*LogEntry, start, end time.Time, filesParsed int) *StatsResponse {
-	stats := &StatsResponse{
-		Period: Period{Start: start, End: end, FilesParsed: filesParsed},
-		QueryTypes:         make(map[string]int),
-		ResponseCategories: make(map[string]int),
-		ReturnCodes:        make(map[string]int),
-	}
+// StatsAccumulator incrementally aggregates LogEntry data for stats computation.
+// Entries can be fed one at a time via Add(), then Finalize() produces the response.
+type StatsAccumulator struct {
+	start, end         time.Time
+	hourly             [24]HourlyBucket
+	domainCounts       map[string]int
+	blockedDomains     map[string]*BlockedDomain
+	clientMap          map[string]*ClientStats
+	uniqueDomains      map[string]struct{}
+	queryTypes         map[string]int
+	responseCategories map[string]int
+	returnCodes        map[string]int
+	durations          []float64
+	durationSum        float64
+	totalQueries       int
+	blockedQueries     int
+	cachedQueries      int
+}
 
-	// Initialize 24 hourly buckets
-	stats.Hourly = make([]HourlyBucket, 24)
+func NewStatsAccumulator(start, end time.Time) *StatsAccumulator {
+	a := &StatsAccumulator{
+		start:              start,
+		end:                end,
+		domainCounts:       make(map[string]int),
+		blockedDomains:     make(map[string]*BlockedDomain),
+		clientMap:          make(map[string]*ClientStats),
+		uniqueDomains:      make(map[string]struct{}),
+		queryTypes:         make(map[string]int),
+		responseCategories: make(map[string]int),
+		returnCodes:        make(map[string]int),
+	}
 	for i := range 24 {
-		stats.Hourly[i].Hour = i
+		a.hourly[i].Hour = i
+	}
+	return a
+}
+
+// Add processes a single log entry into the accumulator.
+func (a *StatsAccumulator) Add(e *LogEntry) {
+	a.totalQueries++
+
+	blocked := e.IsBlocked()
+	cached := e.IsCached()
+
+	if blocked {
+		a.blockedQueries++
+	}
+	if cached {
+		a.cachedQueries++
 	}
 
-	domainCounts := make(map[string]int)
-	blockedDomains := make(map[string]*BlockedDomain)
-	clientMap := make(map[string]*ClientStats)
-	uniqueDomains := make(map[string]bool)
-	var durations []float64
-	var durationSum float64
+	// Hourly
+	h := e.Timestamp.Hour()
+	a.hourly[h].Total++
+	if blocked {
+		a.hourly[h].Blocked++
+	}
+	if cached {
+		a.hourly[h].Cached++
+	}
 
-	for _, e := range entries {
-		stats.Summary.TotalQueries++
+	// Domains
+	a.domainCounts[e.Domain]++
+	a.uniqueDomains[e.Domain] = struct{}{}
 
-		if e.IsBlocked() {
-			stats.Summary.BlockedQueries++
-		}
-		if e.IsCached() {
-			stats.Summary.CachedQueries++
-		}
-
-		// Hourly
-		h := e.Timestamp.Hour()
-		stats.Hourly[h].Total++
-		if e.IsBlocked() {
-			stats.Hourly[h].Blocked++
-		}
-		if e.IsCached() {
-			stats.Hourly[h].Cached++
-		}
-
-		// Domains
-		domainCounts[e.Domain]++
-		uniqueDomains[e.Domain] = true
-
-		// Blocked domains
-		if e.IsBlocked() {
-			if bd, ok := blockedDomains[e.Domain]; ok {
-				bd.Count++
-			} else {
-				blockedDomains[e.Domain] = &BlockedDomain{Domain: e.Domain, Count: 1, Reason: e.ResponseReason}
-			}
-		}
-
-		// Clients
-		if cs, ok := clientMap[e.ClientIP]; ok {
-			cs.Total++
-			if e.IsBlocked() {
-				cs.Blocked++
-			}
+	// Blocked domains
+	if blocked {
+		if bd, ok := a.blockedDomains[e.Domain]; ok {
+			bd.Count++
 		} else {
-			blocked := 0
-			if e.IsBlocked() {
-				blocked = 1
-			}
-			clientMap[e.ClientIP] = &ClientStats{IP: e.ClientIP, Name: e.ClientName, Total: 1, Blocked: blocked}
+			a.blockedDomains[e.Domain] = &BlockedDomain{Domain: e.Domain, Count: 1, Reason: e.ResponseReason}
 		}
-
-		// Query types
-		stats.QueryTypes[e.QueryType]++
-
-		// Response categories
-		stats.ResponseCategories[e.ResponseCategory]++
-
-		// Return codes
-		stats.ReturnCodes[e.ReturnCode]++
-
-		// Durations
-		durations = append(durations, e.DurationMs)
-		durationSum += e.DurationMs
 	}
 
-	stats.Summary.UniqueDomains = len(uniqueDomains)
-	stats.Summary.UniqueClients = len(clientMap)
-
-	if len(durations) > 0 {
-		stats.Summary.AvgDurationMs = math.Round(durationSum/float64(len(durations))*10) / 10
-		sort.Float64s(durations)
-		p95idx := int(float64(len(durations)) * 0.95)
-		if p95idx >= len(durations) {
-			p95idx = len(durations) - 1
+	// Clients
+	if cs, ok := a.clientMap[e.ClientIP]; ok {
+		cs.Total++
+		if blocked {
+			cs.Blocked++
 		}
-		stats.Summary.P95DurationMs = durations[p95idx]
+	} else {
+		b := 0
+		if blocked {
+			b = 1
+		}
+		a.clientMap[e.ClientIP] = &ClientStats{IP: e.ClientIP, Name: e.ClientName, Total: 1, Blocked: b}
+	}
+
+	// Query types
+	a.queryTypes[e.QueryType]++
+
+	// Response categories
+	a.responseCategories[e.ResponseCategory]++
+
+	// Return codes
+	a.returnCodes[e.ReturnCode]++
+
+	// Durations
+	a.durations = append(a.durations, e.DurationMs)
+	a.durationSum += e.DurationMs
+}
+
+// Finalize computes the final StatsResponse from accumulated data.
+func (a *StatsAccumulator) Finalize(filesParsed int) *StatsResponse {
+	stats := &StatsResponse{
+		Period:             Period{Start: a.start, End: a.end, FilesParsed: filesParsed},
+		QueryTypes:         a.queryTypes,
+		ResponseCategories: a.responseCategories,
+		ReturnCodes:        a.returnCodes,
+	}
+
+	stats.Hourly = make([]HourlyBucket, 24)
+	copy(stats.Hourly, a.hourly[:])
+
+	stats.Summary = Summary{
+		TotalQueries:   a.totalQueries,
+		BlockedQueries: a.blockedQueries,
+		CachedQueries:  a.cachedQueries,
+		UniqueDomains:  len(a.uniqueDomains),
+		UniqueClients:  len(a.clientMap),
+	}
+
+	if len(a.durations) > 0 {
+		stats.Summary.AvgDurationMs = math.Round(a.durationSum/float64(len(a.durations))*10) / 10
+		sort.Float64s(a.durations)
+		p95idx := int(float64(len(a.durations)) * 0.95)
+		if p95idx >= len(a.durations) {
+			p95idx = len(a.durations) - 1
+		}
+		stats.Summary.P95DurationMs = a.durations[p95idx]
 	}
 
 	// Top domains (top 20)
-	stats.TopDomains = topN(domainCounts, 20)
+	stats.TopDomains = topN(a.domainCounts, 20)
 
 	// Top blocked (top 20)
-	blockedList := make([]BlockedDomain, 0, len(blockedDomains))
-	for _, bd := range blockedDomains {
+	blockedList := make([]BlockedDomain, 0, len(a.blockedDomains))
+	for _, bd := range a.blockedDomains {
 		blockedList = append(blockedList, *bd)
 	}
 	sort.Slice(blockedList, func(i, j int) bool { return blockedList[i].Count > blockedList[j].Count })
@@ -177,8 +213,8 @@ func ComputeStats(entries []*LogEntry, start, end time.Time, filesParsed int) *S
 	stats.TopBlocked = blockedList
 
 	// Clients sorted by total
-	clients := make([]ClientStats, 0, len(clientMap))
-	for _, cs := range clientMap {
+	clients := make([]ClientStats, 0, len(a.clientMap))
+	for _, cs := range a.clientMap {
 		clients = append(clients, *cs)
 	}
 	sort.Slice(clients, func(i, j int) bool { return clients[i].Total > clients[j].Total })
@@ -187,35 +223,68 @@ func ComputeStats(entries []*LogEntry, start, end time.Time, filesParsed int) *S
 	return stats
 }
 
+// ComputeStats aggregates a slice of LogEntry into stats.
+func ComputeStats(entries []*LogEntry, start, end time.Time, filesParsed int) *StatsResponse {
+	acc := NewStatsAccumulator(start, end)
+	for _, e := range entries {
+		acc.Add(e)
+	}
+	return acc.Finalize(filesParsed)
+}
+
+// TimelineAccumulator incrementally aggregates LogEntry data for timeline computation.
+type TimelineAccumulator struct {
+	interval  time.Duration
+	bucketMap map[int64]*TimelineBucket
+}
+
+func NewTimelineAccumulator(interval time.Duration) *TimelineAccumulator {
+	return &TimelineAccumulator{
+		interval:  interval,
+		bucketMap: make(map[int64]*TimelineBucket),
+	}
+}
+
+// Add processes a single log entry into the timeline accumulator.
+func (a *TimelineAccumulator) Add(e *LogEntry) {
+	key := e.Timestamp.Truncate(a.interval).Unix()
+	b, ok := a.bucketMap[key]
+	if !ok {
+		b = &TimelineBucket{Timestamp: time.Unix(key, 0).UTC()}
+		a.bucketMap[key] = b
+	}
+	b.Total++
+	if e.IsBlocked() {
+		b.Blocked++
+	}
+	if e.IsCached() {
+		b.Cached++
+	}
+}
+
+// Finalize returns sorted timeline buckets.
+func (a *TimelineAccumulator) Finalize() []TimelineBucket {
+	if len(a.bucketMap) == 0 {
+		return nil
+	}
+	result := make([]TimelineBucket, 0, len(a.bucketMap))
+	for _, b := range a.bucketMap {
+		result = append(result, *b)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Timestamp.Before(result[j].Timestamp) })
+	return result
+}
+
 // ComputeTimeline groups entries into time buckets of the given interval.
 func ComputeTimeline(entries []*LogEntry, interval time.Duration) []TimelineBucket {
 	if len(entries) == 0 {
 		return nil
 	}
-
-	bucketMap := make(map[int64]*TimelineBucket)
+	acc := NewTimelineAccumulator(interval)
 	for _, e := range entries {
-		key := e.Timestamp.Truncate(interval).Unix()
-		b, ok := bucketMap[key]
-		if !ok {
-			b = &TimelineBucket{Timestamp: time.Unix(key, 0).UTC()}
-			bucketMap[key] = b
-		}
-		b.Total++
-		if e.IsBlocked() {
-			b.Blocked++
-		}
-		if e.IsCached() {
-			b.Cached++
-		}
+		acc.Add(e)
 	}
-
-	result := make([]TimelineBucket, 0, len(bucketMap))
-	for _, b := range bucketMap {
-		result = append(result, *b)
-	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Timestamp.Before(result[j].Timestamp) })
-	return result
+	return acc.Finalize()
 }
 
 func topN(counts map[string]int, n int) []DomainCount {

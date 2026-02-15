@@ -12,13 +12,14 @@ func GetStats(logDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start, end := parseRange(r)
 
-		entries, filesParsed, err := logparser.LoadEntriesForRange(logDir, start, end)
+		acc := logparser.NewStatsAccumulator(start, end)
+		filesParsed, err := logparser.ProcessFilesStreaming(logDir, start, end, acc.Add)
 		if err != nil {
 			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
 			return
 		}
 
-		stats := logparser.ComputeStats(entries, start, end, filesParsed)
+		stats := acc.Finalize(filesParsed)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
@@ -28,12 +29,6 @@ func GetStats(logDir string) http.HandlerFunc {
 func GetTimeline(logDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start, end := parseRange(r)
-
-		entries, _, err := logparser.LoadEntriesForRange(logDir, start, end)
-		if err != nil {
-			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
-			return
-		}
 
 		intervalStr := r.URL.Query().Get("interval")
 		interval := 15 * time.Minute
@@ -48,7 +43,14 @@ func GetTimeline(logDir string) http.HandlerFunc {
 			interval = 24 * time.Hour
 		}
 
-		timeline := logparser.ComputeTimeline(entries, interval)
+		acc := logparser.NewTimelineAccumulator(interval)
+		_, err := logparser.ProcessFilesStreaming(logDir, start, end, acc.Add)
+		if err != nil {
+			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
+			return
+		}
+
+		timeline := acc.Finalize()
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(timeline)
