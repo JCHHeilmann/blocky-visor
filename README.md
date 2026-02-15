@@ -2,7 +2,9 @@
 
 A sleek, self-hosted web dashboard for [Blocky](https://github.com/0xERR0R/blocky) — monitor your DNS blocking, run queries, and manage your instance from any browser.
 
-![Blocky Visor Dashboard](docs/dashboard.png)
+<p align="center">
+  <img src="docs/dashboard.png" alt="Blocky Visor Dashboard" width="720" />
+</p>
 
 ## About
 
@@ -26,7 +28,7 @@ Blocky Visor is an open-source single-page application that gives you full visib
 
 Blocky Visor includes an optional Go sidecar service that runs alongside Blocky on the same host. It unlocks three additional pages:
 
-- **Analytics** — Historical query analytics with hourly breakdowns, top queried/blocked domains, per-client stats, and response category charts across configurable date ranges.
+- **Analytics** — Historical query analytics integrated into the dashboard via a global Live/Historical mode toggle, with hourly and daily breakdowns, top queried/blocked domains, per-client stats, and response category charts across configurable date ranges.
 - **Query Logs** — Paginated, filterable raw query log viewer.
 - **Config Editor** — Read and edit Blocky's `config.yml` with YAML validation, automatic backups, and one-click service restart.
 
@@ -180,7 +182,7 @@ src/
 │   ├── utils/         # Prometheus metrics parser, formatters
 │   └── types/         # TypeScript interfaces and error classes
 ├── routes/            # Pages: /, /query, /lists, /cache, /settings,
-│                      #         /analytics, /logs, /config
+│                      #         /logs, /config
 └── app.css            # TailwindCSS v4 theme config
 sidecar/               # Optional Go sidecar service
 ```
