@@ -44,6 +44,8 @@ func GetTimeline(logDir string) http.HandlerFunc {
 			interval = 15 * time.Minute
 		case "1h":
 			interval = time.Hour
+		case "1d":
+			interval = 24 * time.Hour
 		}
 
 		timeline := logparser.ComputeTimeline(entries, interval)

@@ -2,27 +2,37 @@
 	import { formatNumber } from '$lib/utils/formatters';
 	import { tooltipStore } from '$lib/stores/tooltip.svelte';
 
-	interface HourlyData {
-		hour: number;
+	interface DailyData {
+		label: string; // "YYYY-MM-DD"
 		total: number;
 		blocked: number;
 		cached: number;
 	}
 
 	interface Props {
-		data: HourlyData[];
+		data: DailyData[];
 	}
 
 	let { data }: Props = $props();
 
 	let maxVal = $derived(Math.max(...data.map((d) => d.total), 1));
 
-	function showTooltip(e: MouseEvent, bucket: HourlyData) {
+	function formatDayLabel(iso: string): string {
+		const date = new Date(iso + 'T00:00:00');
+		return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+	}
+
+	function formatShortLabel(iso: string): string {
+		const date = new Date(iso + 'T00:00:00');
+		return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+	}
+
+	function showTooltip(e: MouseEvent, bucket: DailyData) {
 		const resolved = bucket.total - bucket.blocked - bucket.cached;
-		const hour = String(bucket.hour).padStart(2, '0');
+		const dayLabel = formatDayLabel(bucket.label);
 		const html = `
 			<div class="flex items-center gap-2">
-				<span class="font-medium text-text-primary">${hour}:00</span>
+				<span class="font-medium text-text-primary">${dayLabel}</span>
 			</div>
 			<div class="mt-1 text-xs space-y-0.5">
 				<div class="flex justify-between gap-4">
@@ -61,7 +71,7 @@
 	}
 </script>
 
-<div class="flex items-end gap-1 h-48">
+<div class="flex items-end gap-1.5 h-48">
 	{#each data as bucket}
 		{@const totalPct = (bucket.total / maxVal) * 100}
 		{@const blockedPct = (bucket.blocked / maxVal) * 100}
@@ -74,7 +84,6 @@
 			onmousemove={moveTooltip}
 			onmouseleave={() => tooltipStore.hide()}
 		>
-			<!-- Stacked bar -->
 			<div class="flex flex-col justify-end h-full gap-px">
 				{#if resolvedPct > 0}
 					<div
@@ -102,9 +111,7 @@
 <div class="flex mt-1">
 	{#each data as bucket}
 		<div class="flex-1 text-center text-[10px] text-text-faint">
-			{#if bucket.hour % 3 === 0}
-				{bucket.hour}
-			{/if}
+			{formatShortLabel(bucket.label)}
 		</div>
 	{/each}
 </div>

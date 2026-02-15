@@ -133,6 +133,9 @@ export function parsePrometheusMetrics(text: string): ParsedMetrics {
           };
         }
         break;
+      case "process_start_time_seconds":
+        metrics.processStartTime = parsed.value;
+        break;
     }
   }
 

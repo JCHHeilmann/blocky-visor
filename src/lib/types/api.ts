@@ -45,6 +45,7 @@ export interface ParsedMetrics {
   lastListRefresh?: number;
   failedDownloads?: number;
   buildInfo?: { version: string; buildTime: string };
+  processStartTime?: number;
 }
 
 // Sidecar types

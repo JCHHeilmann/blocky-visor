@@ -9,7 +9,7 @@ export async function fetchStats(range: StatsRange = 'today'): Promise<SidecarSt
 
 export async function fetchTimeline(
 	range: StatsRange = 'today',
-	interval: '5m' | '15m' | '1h' = '15m'
+	interval: '5m' | '15m' | '1h' | '1d' = '15m'
 ): Promise<SidecarTimelineBucket[]> {
 	return sidecarRequest<SidecarTimelineBucket[]>(
 		`/api/stats/timeline?range=${range}&interval=${interval}`

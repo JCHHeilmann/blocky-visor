@@ -30,13 +30,6 @@ Blocky Visor includes an optional Go sidecar service that runs alongside Blocky 
 - **Query Logs** — Paginated, filterable raw query log viewer.
 - **Config Editor** — Read and edit Blocky's `config.yml` with YAML validation, automatic backups, and one-click service restart.
 
-### Design
-
-- Dark-first UI with an oklch-based cool gray palette and teal/cyan accents
-- Responsive layout with a collapsible sidebar
-- Auto-pauses polling when the browser tab is hidden to reduce unnecessary network traffic
-- All settings stored in `localStorage` — no server-side state, no accounts, no auth required for the dashboard itself
-
 ## Installation
 
 ### Prerequisites
