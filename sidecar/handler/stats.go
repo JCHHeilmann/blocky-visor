@@ -8,52 +8,35 @@ import (
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
 )
 
-func GetStats(logDir string) http.HandlerFunc {
+func GetStats(logDir string, cache *logparser.StatsCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start, end := parseRange(r)
-
-		acc := logparser.NewStatsAccumulator(start, end)
-		filesParsed, err := logparser.ProcessFilesStreaming(logDir, start, end, acc.Add)
-		if err != nil {
-			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
-			return
-		}
-
-		stats := acc.Finalize(filesParsed)
-
+		stats := cache.ComputeStats(logDir, start, end)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
 	}
 }
 
-func GetTimeline(logDir string) http.HandlerFunc {
+func GetTimeline(logDir string, cache *logparser.StatsCache) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start, end := parseRange(r)
-
-		intervalStr := r.URL.Query().Get("interval")
-		interval := 15 * time.Minute
-		switch intervalStr {
-		case "5m":
-			interval = 5 * time.Minute
-		case "15m":
-			interval = 15 * time.Minute
-		case "1h":
-			interval = time.Hour
-		case "1d":
-			interval = 24 * time.Hour
-		}
-
-		acc := logparser.NewTimelineAccumulator(interval)
-		_, err := logparser.ProcessFilesStreaming(logDir, start, end, acc.Add)
-		if err != nil {
-			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
-			return
-		}
-
-		timeline := acc.Finalize()
-
+		interval := parseInterval(r)
+		timeline := cache.ComputeTimeline(logDir, start, end, interval)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(timeline)
+	}
+}
+
+func parseInterval(r *http.Request) time.Duration {
+	switch r.URL.Query().Get("interval") {
+	case "5m":
+		return 5 * time.Minute
+	case "1h":
+		return time.Hour
+	case "1d":
+		return 24 * time.Hour
+	default:
+		return 15 * time.Minute
 	}
 }
 

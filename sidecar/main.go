@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/handler"
+	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/middleware"
 )
 
@@ -39,8 +40,9 @@ func main() {
 		r.Get("/api/service/status", handler.ServiceStatus(cfg.Blocky.ServiceName))
 		r.Post("/api/service/restart", handler.ServiceRestart(cfg.Blocky.ServiceName))
 
-		r.Get("/api/stats", handler.GetStats(cfg.Blocky.LogDir))
-		r.Get("/api/stats/timeline", handler.GetTimeline(cfg.Blocky.LogDir))
+		statsCache := logparser.NewStatsCache()
+		r.Get("/api/stats", handler.GetStats(cfg.Blocky.LogDir, statsCache))
+		r.Get("/api/stats/timeline", handler.GetTimeline(cfg.Blocky.LogDir, statsCache))
 
 		r.Get("/api/logs", handler.GetLogs(cfg.Blocky.LogDir))
 	})

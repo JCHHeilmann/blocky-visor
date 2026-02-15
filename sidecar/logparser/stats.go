@@ -168,6 +168,57 @@ func (a *StatsAccumulator) Add(e *LogEntry) {
 	a.durationSum += e.DurationMs
 }
 
+// Merge combines another accumulator's data into this one.
+func (a *StatsAccumulator) Merge(other *StatsAccumulator) {
+	a.totalQueries += other.totalQueries
+	a.blockedQueries += other.blockedQueries
+	a.cachedQueries += other.cachedQueries
+
+	for i := range 24 {
+		a.hourly[i].Total += other.hourly[i].Total
+		a.hourly[i].Blocked += other.hourly[i].Blocked
+		a.hourly[i].Cached += other.hourly[i].Cached
+	}
+
+	for k, v := range other.domainCounts {
+		a.domainCounts[k] += v
+	}
+	for k := range other.uniqueDomains {
+		a.uniqueDomains[k] = struct{}{}
+	}
+	for k, v := range other.queryTypes {
+		a.queryTypes[k] += v
+	}
+	for k, v := range other.responseCategories {
+		a.responseCategories[k] += v
+	}
+	for k, v := range other.returnCodes {
+		a.returnCodes[k] += v
+	}
+
+	for k, v := range other.blockedDomains {
+		if bd, ok := a.blockedDomains[k]; ok {
+			bd.Count += v.Count
+		} else {
+			cp := *v
+			a.blockedDomains[k] = &cp
+		}
+	}
+
+	for k, v := range other.clientMap {
+		if cs, ok := a.clientMap[k]; ok {
+			cs.Total += v.Total
+			cs.Blocked += v.Blocked
+		} else {
+			cp := *v
+			a.clientMap[k] = &cp
+		}
+	}
+
+	a.durations = append(a.durations, other.durations...)
+	a.durationSum += other.durationSum
+}
+
 // Finalize computes the final StatsResponse from accumulated data.
 func (a *StatsAccumulator) Finalize(filesParsed int) *StatsResponse {
 	stats := &StatsResponse{
@@ -260,6 +311,37 @@ func (a *TimelineAccumulator) Add(e *LogEntry) {
 	if e.IsCached() {
 		b.Cached++
 	}
+}
+
+// Merge combines another timeline accumulator's buckets into this one.
+func (a *TimelineAccumulator) Merge(other *TimelineAccumulator) {
+	for k, v := range other.bucketMap {
+		if b, ok := a.bucketMap[k]; ok {
+			b.Total += v.Total
+			b.Blocked += v.Blocked
+			b.Cached += v.Cached
+		} else {
+			cp := *v
+			a.bucketMap[k] = &cp
+		}
+	}
+}
+
+// ReaggregateTo converts buckets to a coarser interval (e.g. hourly -> daily).
+func (a *TimelineAccumulator) ReaggregateTo(interval time.Duration) *TimelineAccumulator {
+	out := NewTimelineAccumulator(interval)
+	for _, b := range a.bucketMap {
+		key := b.Timestamp.Truncate(interval).Unix()
+		ob, ok := out.bucketMap[key]
+		if !ok {
+			ob = &TimelineBucket{Timestamp: time.Unix(key, 0).UTC()}
+			out.bucketMap[key] = ob
+		}
+		ob.Total += b.Total
+		ob.Blocked += b.Blocked
+		ob.Cached += b.Cached
+	}
+	return out
 }
 
 // Finalize returns sorted timeline buckets.
