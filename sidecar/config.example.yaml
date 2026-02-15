@@ -1,0 +1,13 @@
+listen: ":8550"
+api_key: "change-me-to-a-random-string"
+cors_origins:
+  - http://localhost:5173
+  - http://blocky-visor.internal
+
+# Blocky installation directory. Defaults to /opt/blocky.
+# config_path and log_dir are derived from this unless overridden.
+blocky:
+  dir: /opt/blocky
+  # config_path: /opt/blocky/config.yml   # override if non-standard
+  # log_dir: /opt/blocky/logs             # override if non-standard
+  # service_name: blocky                  # systemd service name
