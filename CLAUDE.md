@@ -62,6 +62,7 @@ sidecar/               # Optional Go sidecar service
 ## Blocky API
 
 Blocky REST API (no auth) at port 4000:
+
 - `GET /api/blocking/status` — returns `{ enabled, disabledGroups?, autoEnableInSec? }`
 - `GET /api/blocking/enable` — enable blocking
 - `GET /api/blocking/disable?duration=5m&groups=ads` — disable blocking
@@ -73,6 +74,7 @@ Blocky REST API (no auth) at port 4000:
 ## Sidecar API
 
 Go sidecar (default port 8550), all authenticated routes require `X-API-Key` header:
+
 - `GET /api/health` — unauthenticated health check
 - `GET /api/config` — read Blocky's `config.yml`
 - `PUT /api/config` — write Blocky's config (creates timestamped backup)
@@ -85,6 +87,7 @@ Go sidecar (default port 8550), all authenticated routes require `X-API-Key` hea
 ## Blocky Prometheus Metrics
 
 Metric names used by the parser (Blocky v0.28):
+
 - `blocky_cache_hits_total`, `blocky_cache_misses_total`, `blocky_cache_entries`
 - `blocky_denylist_cache_entries{group="..."}` — per-group denylist entry counts
 - `blocky_prefetch_hits_total`, `blocky_prefetches_total`

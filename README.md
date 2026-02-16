@@ -151,12 +151,12 @@ The dev server runs at `http://localhost:5173` with hot module replacement.
 
 ### Commands
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server with HMR |
-| `npm run build` | Build static files to `build/` |
-| `npm run preview` | Preview the production build |
-| `npm run check` | Run `svelte-check` for type errors |
+| Command           | Description                        |
+| ----------------- | ---------------------------------- |
+| `npm run dev`     | Start dev server with HMR          |
+| `npm run build`   | Build static files to `build/`     |
+| `npm run preview` | Preview the production build       |
+| `npm run check`   | Run `svelte-check` for type errors |
 
 ### Tech Stack
 
@@ -191,12 +191,12 @@ sidecar/               # Optional Go sidecar service
 
 Blocky Visor communicates with Blocky's REST API (no auth, port 4000 by default):
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/blocking/status` | GET | Blocking status |
-| `/api/blocking/enable` | GET | Enable blocking |
-| `/api/blocking/disable` | GET | Disable blocking (supports `?duration=` and `?groups=`) |
-| `/api/query` | POST | DNS query (`{ query, type }`) |
-| `/api/lists/refresh` | POST | Re-download blocking lists |
-| `/api/cache/flush` | PUT | Flush DNS cache |
-| `/metrics` | GET | Prometheus metrics |
+| Endpoint                | Method | Description                                             |
+| ----------------------- | ------ | ------------------------------------------------------- |
+| `/api/blocking/status`  | GET    | Blocking status                                         |
+| `/api/blocking/enable`  | GET    | Enable blocking                                         |
+| `/api/blocking/disable` | GET    | Disable blocking (supports `?duration=` and `?groups=`) |
+| `/api/query`            | POST   | DNS query (`{ query, type }`)                           |
+| `/api/lists/refresh`    | POST   | Re-download blocking lists                              |
+| `/api/cache/flush`      | PUT    | Flush DNS cache                                         |
+| `/metrics`              | GET    | Prometheus metrics                                      |

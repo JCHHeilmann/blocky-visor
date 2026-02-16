@@ -6,11 +6,11 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/handler"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/middleware"
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {

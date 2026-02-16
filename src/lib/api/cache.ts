@@ -1,5 +1,5 @@
-import { apiRequest } from './client';
+import { apiRequest } from "./client";
 
 export async function flushCache(): Promise<void> {
-	await apiRequest('/api/cache/flush', { method: 'PUT' });
+  await apiRequest("/api/cache/flush", { method: "PUT" });
 }
