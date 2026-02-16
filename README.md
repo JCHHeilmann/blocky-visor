@@ -32,6 +32,8 @@ Blocky Visor includes an optional Go sidecar service that runs alongside Blocky 
 - **Query Logs** — Paginated, filterable raw query log viewer.
 - **Config Editor** — Read and edit Blocky's `config.yml` with YAML validation, automatic backups, and one-click service restart.
 
+**Platform compatibility:** The sidecar runs on any platform that Go supports (Linux, macOS, FreeBSD, etc.). However, the **service status** and **restart** features require a Linux system with **systemd** (e.g. Debian, Ubuntu, Fedora, Arch). On systems without systemd, all other sidecar features (analytics, logs, config editing) work normally.
+
 ## Installation
 
 ### Prerequisites
@@ -122,7 +124,12 @@ cors_origins:
 
 blocky:
   dir: /opt/blocky
+  # service_name: blocky     # systemd service name (default: "blocky")
+  # config_path: ...         # override if non-standard
+  # log_dir: ...             # override if non-standard
 ```
+
+The `service_name` option controls which systemd unit the sidecar manages (status checks and restarts). It defaults to `"blocky"`. If Blocky is not managed by systemd on your system, you can ignore this setting — the sidecar will detect that systemd is unavailable and disable service management gracefully.
 
 Then in Blocky Visor's **Settings** page, enter the sidecar URL and API key.
 

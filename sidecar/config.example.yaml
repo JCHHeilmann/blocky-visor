@@ -10,4 +10,6 @@ blocky:
   dir: /opt/blocky
   # config_path: /opt/blocky/config.yml   # override if non-standard
   # log_dir: /opt/blocky/logs             # override if non-standard
-  # service_name: blocky                  # systemd service name
+  # service_name: blocky                  # systemd service name (for status/restart)
+  # only works on Linux with systemd;
+  # ignored gracefully on other platforms

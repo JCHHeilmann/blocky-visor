@@ -1,10 +1,20 @@
 package blocky
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 )
+
+// ErrSystemdNotAvailable is returned when systemctl is not found on the system.
+var ErrSystemdNotAvailable = errors.New("systemd is not available: systemctl not found in PATH")
+
+// SystemdAvailable checks whether systemctl exists on the system.
+func SystemdAvailable() bool {
+	_, err := exec.LookPath("systemctl")
+	return err == nil
+}
 
 // ServiceInfo holds parsed systemd service status.
 type ServiceInfo struct {
@@ -18,6 +28,9 @@ type ServiceInfo struct {
 
 // Status queries systemctl for the service status.
 func Status(serviceName string) (*ServiceInfo, error) {
+	if !SystemdAvailable() {
+		return nil, ErrSystemdNotAvailable
+	}
 	// Get full status output
 	out, _ := exec.Command("systemctl", "status", serviceName).CombinedOutput()
 	fullStatus := string(out)
@@ -59,6 +72,9 @@ func Status(serviceName string) (*ServiceInfo, error) {
 
 // Restart restarts the systemd service.
 func Restart(serviceName string) error {
+	if !SystemdAvailable() {
+		return ErrSystemdNotAvailable
+	}
 	out, err := exec.Command("systemctl", "restart", serviceName).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("restart failed: %s: %w", string(out), err)

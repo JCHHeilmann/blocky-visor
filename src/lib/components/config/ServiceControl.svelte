@@ -3,12 +3,13 @@
   import Modal from "$lib/components/ui/Modal.svelte";
   import { fetchServiceStatus, restartService } from "$lib/api/sidecar-service";
   import { toastStore } from "$lib/stores/toasts.svelte";
-  import type { SidecarServiceStatus } from "$lib/types/api";
+  import { ApiError, type SidecarServiceStatus } from "$lib/types/api";
 
   let status = $state<SidecarServiceStatus | null>(null);
   let loading = $state(false);
   let restarting = $state(false);
   let error = $state<string | null>(null);
+  let unsupported = $state(false);
   let showConfirm = $state(false);
 
   async function loadStatus() {
@@ -17,8 +18,12 @@
     try {
       status = await fetchServiceStatus();
     } catch (err) {
-      error =
-        err instanceof Error ? err.message : "Failed to get service status";
+      if (err instanceof ApiError && err.status === 501) {
+        unsupported = true;
+      } else {
+        error =
+          err instanceof Error ? err.message : "Failed to get service status";
+      }
     } finally {
       loading = false;
     }
@@ -44,7 +49,7 @@
   $effect(() => {
     loadStatus();
     const interval = setInterval(() => {
-      if (!document.hidden) loadStatus();
+      if (!document.hidden && !unsupported) loadStatus();
     }, 10000);
     return () => clearInterval(interval);
   });
@@ -53,58 +58,70 @@
 </script>
 
 <div class="space-y-4">
-  {#if error}
+  {#if unsupported}
     <div
-      class="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-3 text-sm text-red-400"
+      class="rounded-lg border border-amber-600/30 bg-amber-600/10 px-4 py-3 text-sm text-amber-400"
     >
-      {error}
+      <p class="font-medium">Service management unavailable</p>
+      <p class="mt-1 text-xs text-amber-400/80">
+        The sidecar host does not have systemd. Service status and restart
+        require a Linux system with systemd (e.g. Debian, Ubuntu, Fedora).
+      </p>
     </div>
-  {/if}
-
-  {#if status}
-    <div class="space-y-3 text-sm">
-      <div class="flex items-center justify-between">
-        <span class="text-text-muted">Status</span>
-        <span class="flex items-center gap-2">
-          <span
-            class="h-2 w-2 rounded-full {isActive
-              ? 'bg-green-500'
-              : 'bg-red-500'}"
-          ></span>
-          <span
-            class="font-medium {isActive ? 'text-green-400' : 'text-red-400'}"
-          >
-            {status.active} ({status.sub_state})
-          </span>
-        </span>
+  {:else}
+    {#if error}
+      <div
+        class="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-3 text-sm text-red-400"
+      >
+        {error}
       </div>
-      {#if status.pid}
-        <div class="flex justify-between">
-          <span class="text-text-muted">PID</span>
-          <span class="font-mono text-text-primary">{status.pid}</span>
+    {/if}
+
+    {#if status}
+      <div class="space-y-3 text-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-text-muted">Status</span>
+          <span class="flex items-center gap-2">
+            <span
+              class="h-2 w-2 rounded-full {isActive
+                ? 'bg-green-500'
+                : 'bg-red-500'}"
+            ></span>
+            <span
+              class="font-medium {isActive ? 'text-green-400' : 'text-red-400'}"
+            >
+              {status.active} ({status.sub_state})
+            </span>
+          </span>
         </div>
-      {/if}
-      {#if status.memory}
-        <div class="flex justify-between">
-          <span class="text-text-muted">Memory</span>
-          <span class="font-mono text-text-primary">{status.memory}</span>
-        </div>
-      {/if}
+        {#if status.pid}
+          <div class="flex justify-between">
+            <span class="text-text-muted">PID</span>
+            <span class="font-mono text-text-primary">{status.pid}</span>
+          </div>
+        {/if}
+        {#if status.memory}
+          <div class="flex justify-between">
+            <span class="text-text-muted">Memory</span>
+            <span class="font-mono text-text-primary">{status.memory}</span>
+          </div>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="flex gap-3">
+      <Button
+        variant="danger"
+        onclick={() => (showConfirm = true)}
+        loading={restarting}
+      >
+        Restart Blocky
+      </Button>
+      <Button variant="ghost" onclick={loadStatus} {loading}>
+        Refresh Status
+      </Button>
     </div>
   {/if}
-
-  <div class="flex gap-3">
-    <Button
-      variant="danger"
-      onclick={() => (showConfirm = true)}
-      loading={restarting}
-    >
-      Restart Blocky
-    </Button>
-    <Button variant="ghost" onclick={loadStatus} {loading}>
-      Refresh Status
-    </Button>
-  </div>
 </div>
 
 <Modal
