@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
+	"github.com/JCHHeilmann/blocky-visor/sidecar/resolver"
 )
 
-func StreamLogs(logDir string) http.HandlerFunc {
+func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -53,6 +54,9 @@ func StreamLogs(logDir string) http.HandlerFunc {
 				entry, err := logparser.ParseLine(line)
 				if err != nil {
 					continue
+				}
+				if name := hr.Lookup(entry.ClientIP); name != "" {
+					entry.ResolvedName = name
 				}
 				if matchesFilter(entry, filter) {
 					allFiltered = append(allFiltered, entry)
@@ -135,6 +139,9 @@ func StreamLogs(logDir string) http.HandlerFunc {
 					entry, err := logparser.ParseLine(line)
 					if err != nil {
 						continue
+					}
+					if name := hr.Lookup(entry.ClientIP); name != "" {
+						entry.ResolvedName = name
 					}
 					if !matchesFilter(entry, filter) {
 						continue

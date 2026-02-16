@@ -3,7 +3,6 @@
   import type { SidecarLogEntry } from "$lib/types/api";
   import type { StatsRange } from "$lib/api/sidecar-stats";
   import { fetchLogs, buildLogStreamUrl } from "$lib/api/sidecar-stats";
-  import { dnsQuery } from "$lib/api/query";
 
   interface Props {
     range: StatsRange;
@@ -40,48 +39,8 @@
   let sseConnected = $state(false);
   const LIVE_CAP = 200;
 
-  // Client hostname resolution
-  let hostnames = $state<Record<string, string>>({});
-
-  function ipToArpa(ip: string): string | null {
-    const parts = ip.split(".");
-    if (parts.length !== 4) return null;
-    return parts.reverse().join(".") + ".in-addr.arpa";
-  }
-
-  async function resolveHostname(ip: string): Promise<string | null> {
-    const arpa = ipToArpa(ip);
-    if (!arpa) return null;
-    try {
-      const result = await dnsQuery(arpa, "PTR");
-      if (
-        result.returnCode === "NOERROR" &&
-        result.response &&
-        result.response !== ""
-      ) {
-        const match = result.response.match(/PTR\s*\(([^)]+)\)/);
-        if (match) return match[1].replace(/\.$/, "");
-        return result.response.replace(/\.$/, "").trim();
-      }
-    } catch {}
-    return null;
-  }
-
-  function resolveNewClients(ips: string[]) {
-    for (const ip of ips) {
-      if (ip in hostnames) continue;
-      hostnames[ip] = "";
-      resolveHostname(ip).then((name) => {
-        if (name) {
-          hostnames = { ...hostnames, [ip]: name };
-        }
-      });
-    }
-  }
-
   function clientDisplay(entry: SidecarLogEntry): string {
-    const resolved = hostnames[entry.client_ip];
-    if (resolved) return resolved;
+    if (entry.resolved_name) return entry.resolved_name;
     if (entry.client_name && entry.client_name !== entry.client_ip)
       return entry.client_name;
     return entry.client_ip;
@@ -89,24 +48,6 @@
 
   function stripDot(domain: string): string {
     return domain.endsWith(".") ? domain.slice(0, -1) : domain;
-  }
-
-  // Resolve a client filter to a value the server can match.
-  // If the filter matches a PTR-resolved hostname, return the IP instead.
-  function resolveClientFilter(): string | undefined {
-    const f = filterClient.trim();
-    if (!f) return undefined;
-    // Already looks like an IP — send directly
-    if (/^\d/.test(f)) return f;
-    // Check resolved hostnames for a match
-    const lf = f.toLowerCase();
-    for (const [ip, hostname] of Object.entries(hostnames)) {
-      if (hostname && hostname.toLowerCase().includes(lf)) {
-        return ip;
-      }
-    }
-    // Return as-is — might match ClientName on server
-    return f;
   }
 
   let loadGen = 0;
@@ -126,12 +67,11 @@
         limit,
         offset: currentOffset,
         domain: filterDomain || undefined,
-        client: resolveClientFilter(),
+        client: filterClient || undefined,
         type: filterType || undefined,
       });
       if (gen !== loadGen) return; // Stale response, discard
       const keyed = keyEntries(result.entries);
-      resolveNewClients(keyed.map((e) => e.client_ip));
       if (currentOffset === 0) {
         entries = keyed;
       } else {
@@ -186,7 +126,7 @@
     error = null;
 
     const url = buildLogStreamUrl({
-      client: resolveClientFilter(),
+      client: filterClient || undefined,
       domain: filterDomain || undefined,
       type: filterType || undefined,
     });
@@ -202,7 +142,6 @@
       try {
         const backfillEntries = JSON.parse(event.data) as SidecarLogEntry[];
         const keyed = keyEntries([...backfillEntries].reverse().slice(0, LIVE_CAP));
-        resolveNewClients(keyed.map((e) => e.client_ip));
         entries = keyed;
         total = entries.length;
       } catch {}
@@ -212,7 +151,6 @@
       try {
         const entry = JSON.parse(event.data) as SidecarLogEntry;
         const [keyed] = keyEntries([entry]);
-        resolveNewClients([keyed.client_ip]);
         entries = [keyed, ...entries.slice(0, LIVE_CAP - 1)];
         total = entries.length;
       } catch {}

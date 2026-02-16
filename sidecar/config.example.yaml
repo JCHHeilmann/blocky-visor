@@ -4,6 +4,12 @@ cors_origins:
   - http://localhost:5173
   - http://blocky-visor.internal
 
+# DNS server for resolving client IPs to hostnames (PTR lookups).
+# Set this to your router/DHCP server to avoid queries going through Blocky.
+# Example: "192.168.178.1" (Fritz!Box), "192.168.1.1" (typical router)
+# If omitted, uses the system default resolver.
+# dns_resolver: "192.168.178.1"
+
 # Blocky installation directory. Defaults to /opt/blocky.
 # config_path and log_dir are derived from this unless overridden.
 blocky:

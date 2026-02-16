@@ -14,6 +14,7 @@ type Config struct {
 	Listen      string   `yaml:"listen"`
 	APIKey      string   `yaml:"api_key"`
 	CORSOrigins []string `yaml:"cors_origins"`
+	DNSResolver string   `yaml:"dns_resolver"`
 	Blocky      struct {
 		Dir         string `yaml:"dir"`
 		ConfigPath  string `yaml:"config_path"`

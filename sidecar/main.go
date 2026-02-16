@@ -9,6 +9,7 @@ import (
 	"github.com/JCHHeilmann/blocky-visor/sidecar/handler"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/middleware"
+	"github.com/JCHHeilmann/blocky-visor/sidecar/resolver"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
@@ -44,8 +45,9 @@ func main() {
 		r.Get("/api/stats", handler.GetStats(cfg.Blocky.LogDir, statsCache))
 		r.Get("/api/stats/timeline", handler.GetTimeline(cfg.Blocky.LogDir, statsCache))
 
-		r.Get("/api/logs", handler.GetLogs(cfg.Blocky.LogDir))
-		r.Get("/api/logs/stream", handler.StreamLogs(cfg.Blocky.LogDir))
+		hostResolver := resolver.New(cfg.DNSResolver)
+		r.Get("/api/logs", handler.GetLogs(cfg.Blocky.LogDir, hostResolver))
+		r.Get("/api/logs/stream", handler.StreamLogs(cfg.Blocky.LogDir, hostResolver))
 	})
 
 	fmt.Printf("Blocky Visor sidecar listening on %s\n", cfg.Listen)

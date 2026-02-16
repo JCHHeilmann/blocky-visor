@@ -12,6 +12,7 @@ type LogEntry struct {
 	Timestamp        time.Time `json:"timestamp"`
 	ClientIP         string    `json:"client_ip"`
 	ClientName       string    `json:"client_name"`
+	ResolvedName     string    `json:"resolved_name,omitempty"`
 	DurationMs       float64   `json:"duration_ms"`
 	ResponseReason   string    `json:"response_reason"`
 	Domain           string    `json:"domain"`

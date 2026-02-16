@@ -3,13 +3,15 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
+	"github.com/JCHHeilmann/blocky-visor/sidecar/resolver"
 )
 
-func GetLogs(logDir string) http.HandlerFunc {
+func GetLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start, end := parseRange(r)
 
@@ -41,13 +43,49 @@ func GetLogs(logDir string) http.HandlerFunc {
 			end = now
 		}
 
-		result, err := logparser.QueryLogs(logDir, start, end, filter, limit, offset)
+		entries, _, err := logparser.LoadEntriesForRange(logDir, start, end)
 		if err != nil {
 			http.Error(w, jsonErr(err.Error()), http.StatusInternalServerError)
 			return
 		}
 
+		// Enrich with resolved hostnames before filtering
+		enrichEntries(entries, hr)
+
+		// Filter
+		filtered := logparser.FilterEntries(entries, filter)
+
+		// Sort reverse chronological
+		sort.Slice(filtered, func(i, j int) bool {
+			return filtered[i].Timestamp.After(filtered[j].Timestamp)
+		})
+
+		// Paginate
+		total := len(filtered)
+		if offset >= total {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(logparser.LogsResponse{Total: total, Offset: offset, Limit: limit, Entries: []*logparser.LogEntry{}})
+			return
+		}
+		endIdx := offset + limit
+		if endIdx > total {
+			endIdx = total
+		}
+
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+		json.NewEncoder(w).Encode(logparser.LogsResponse{
+			Total:   total,
+			Offset:  offset,
+			Limit:   limit,
+			Entries: filtered[offset:endIdx],
+		})
+	}
+}
+
+func enrichEntries(entries []*logparser.LogEntry, hr *resolver.HostResolver) {
+	for _, e := range entries {
+		if name := hr.Lookup(e.ClientIP); name != "" {
+			e.ResolvedName = name
+		}
 	}
 }

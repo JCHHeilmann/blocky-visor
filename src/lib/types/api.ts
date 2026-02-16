@@ -81,6 +81,7 @@ export interface SidecarLogEntry {
   timestamp: string;
   client_ip: string;
   client_name: string;
+  resolved_name?: string;
   domain: string;
   query_type: string;
   response_reason: string;
