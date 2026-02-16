@@ -1,4 +1,5 @@
 import { sidecarRequest } from "./sidecar";
+import { settingsStore } from "$lib/stores/settings.svelte";
 import type {
   SidecarStatsResponse,
   SidecarTimelineBucket,
@@ -42,4 +43,18 @@ export async function fetchLogs(
 
   const qs = searchParams.toString();
   return sidecarRequest<SidecarLogsResponse>(`/api/logs${qs ? `?${qs}` : ""}`);
+}
+
+export function buildLogStreamUrl(filters?: {
+  client?: string;
+  domain?: string;
+  type?: string;
+}): string {
+  const { sidecarUrl, sidecarApiKey } = settingsStore;
+  const params = new URLSearchParams();
+  params.set("key", sidecarApiKey);
+  if (filters?.client) params.set("client", filters.client);
+  if (filters?.domain) params.set("domain", filters.domain);
+  if (filters?.type) params.set("type", filters.type);
+  return `${sidecarUrl}/api/logs/stream?${params.toString()}`;
 }

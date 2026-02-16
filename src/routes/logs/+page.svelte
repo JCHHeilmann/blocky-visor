@@ -6,11 +6,22 @@
   import type { StatsRange } from "$lib/api/sidecar-stats";
 
   let range = $state<StatsRange>("today");
+  let live = $state(false);
 </script>
 
-<div class="space-y-6">
-  <div class="flex justify-end">
-    <DateRangeSelector value={range} onchange={(r) => (range = r)} />
+<div class="flex flex-col h-full">
+  <div class="shrink-0 flex justify-end pb-4">
+    {#if live}
+      <div class="flex gap-1.5">
+        <span
+          class="rounded-lg px-3 py-1.5 text-sm font-medium bg-surface-secondary text-text-muted border border-surface-border cursor-not-allowed opacity-50"
+        >
+          Live mode active
+        </span>
+      </div>
+    {:else}
+      <DateRangeSelector value={range} onchange={(r) => (range = r)} />
+    {/if}
   </div>
 
   {#if !sidecarStore.configured}
@@ -20,8 +31,8 @@
       </p>
     </Card>
   {:else}
-    <Card>
-      <LogViewer {range} />
+    <Card class="flex-1 min-h-0 flex flex-col overflow-hidden !p-4">
+      <LogViewer {range} {live} onlivechange={(v) => (live = v)} />
     </Card>
   {/if}
 </div>

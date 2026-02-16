@@ -45,6 +45,7 @@ func main() {
 		r.Get("/api/stats/timeline", handler.GetTimeline(cfg.Blocky.LogDir, statsCache))
 
 		r.Get("/api/logs", handler.GetLogs(cfg.Blocky.LogDir))
+		r.Get("/api/logs/stream", handler.StreamLogs(cfg.Blocky.LogDir))
 	})
 
 	fmt.Printf("Blocky Visor sidecar listening on %s\n", cfg.Listen)
