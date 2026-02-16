@@ -115,7 +115,7 @@ func FilterEntries(entries []*LogEntry, filter LogFilter) []*LogEntry {
 
 	var result []*LogEntry
 	for _, e := range entries {
-		if filter.Client != "" && !strings.Contains(e.ClientIP, filter.Client) && !strings.Contains(e.ClientName, filter.Client) {
+		if filter.Client != "" && !strings.Contains(strings.ToLower(e.ClientIP), strings.ToLower(filter.Client)) && !strings.Contains(strings.ToLower(e.ClientName), strings.ToLower(filter.Client)) {
 			continue
 		}
 		if filter.Domain != "" && !strings.Contains(strings.ToLower(e.Domain), strings.ToLower(filter.Domain)) {

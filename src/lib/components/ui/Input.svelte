@@ -2,6 +2,7 @@
   interface Props {
     value: string;
     oninput?: (value: string) => void;
+    onkeydown?: (e: KeyboardEvent) => void;
     placeholder?: string;
     type?: string;
     label?: string;
@@ -12,6 +13,7 @@
   let {
     value = $bindable(),
     oninput,
+    onkeydown,
     placeholder = "",
     type = "text",
     label,
@@ -42,6 +44,7 @@
   {placeholder}
   {disabled}
   oninput={handleInput}
+  {onkeydown}
   class="w-full rounded-lg border border-surface-border bg-surface-secondary px-3 py-2 text-sm text-text-primary
 		placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1
 		focus:ring-accent-500 disabled:opacity-50 {className}"

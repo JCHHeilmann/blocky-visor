@@ -1,6 +1,5 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import Input from "$lib/components/ui/Input.svelte";
   import type { SidecarLogEntry } from "$lib/types/api";
   import type { StatsRange } from "$lib/api/sidecar-stats";
   import { fetchLogs, buildLogStreamUrl } from "$lib/api/sidecar-stats";
@@ -9,17 +8,23 @@
   interface Props {
     range: StatsRange;
     live: boolean;
-    onlivechange: (live: boolean) => void;
   }
 
-  let { range, live, onlivechange }: Props = $props();
+  let { range, live }: Props = $props();
 
-  let entries = $state<SidecarLogEntry[]>([]);
+  type KeyedEntry = SidecarLogEntry & { _id: number };
+
+  let entries = $state<KeyedEntry[]>([]);
   let total = $state(0);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let offset = $state(0);
   const limit = 50;
+  let nextId = 0;
+
+  function keyEntries(raw: SidecarLogEntry[]): KeyedEntry[] {
+    return raw.map((e) => ({ ...e, _id: nextId++ }));
+  }
 
   let filterDomain = $state("");
   let filterClient = $state("");
@@ -33,7 +38,7 @@
   // Live streaming
   let eventSource: EventSource | null = $state(null);
   let sseConnected = $state(false);
-  const LIVE_CAP = 500;
+  const LIVE_CAP = 200;
 
   // Client hostname resolution
   let hostnames = $state<Record<string, string>>({});
@@ -74,11 +79,6 @@
     }
   }
 
-  $effect(() => {
-    const ips = [...new Set(entries.map((e) => e.client_ip))];
-    untrack(() => resolveNewClients(ips));
-  });
-
   function clientDisplay(entry: SidecarLogEntry): string {
     const resolved = hostnames[entry.client_ip];
     if (resolved) return resolved;
@@ -91,6 +91,26 @@
     return domain.endsWith(".") ? domain.slice(0, -1) : domain;
   }
 
+  // Resolve a client filter to a value the server can match.
+  // If the filter matches a PTR-resolved hostname, return the IP instead.
+  function resolveClientFilter(): string | undefined {
+    const f = filterClient.trim();
+    if (!f) return undefined;
+    // Already looks like an IP — send directly
+    if (/^\d/.test(f)) return f;
+    // Check resolved hostnames for a match
+    const lf = f.toLowerCase();
+    for (const [ip, hostname] of Object.entries(hostnames)) {
+      if (hostname && hostname.toLowerCase().includes(lf)) {
+        return ip;
+      }
+    }
+    // Return as-is — might match ClientName on server
+    return f;
+  }
+
+  let loadGen = 0;
+
   async function load(reset = false) {
     if (reset) {
       offset = 0;
@@ -98,6 +118,7 @@
     }
     loading = true;
     error = null;
+    const gen = ++loadGen;
     try {
       const currentOffset = offset;
       const result = await fetchLogs({
@@ -105,19 +126,23 @@
         limit,
         offset: currentOffset,
         domain: filterDomain || undefined,
-        client: filterClient || undefined,
+        client: resolveClientFilter(),
         type: filterType || undefined,
       });
+      if (gen !== loadGen) return; // Stale response, discard
+      const keyed = keyEntries(result.entries);
+      resolveNewClients(keyed.map((e) => e.client_ip));
       if (currentOffset === 0) {
-        entries = result.entries;
+        entries = keyed;
       } else {
-        entries = [...entries, ...result.entries];
+        entries = [...entries, ...keyed];
       }
       total = result.total;
     } catch (err) {
+      if (gen !== loadGen) return;
       error = err instanceof Error ? err.message : "Failed to load logs";
     } finally {
-      loading = false;
+      if (gen === loadGen) loading = false;
     }
   }
 
@@ -154,27 +179,17 @@
     };
   });
 
-  // Live mode SSE
-  $effect(() => {
-    if (!live) {
-      closeSse();
-      return;
-    }
+  function connectSse() {
+    closeSse();
+    entries = [];
+    total = 0;
+    error = null;
 
-    // When entering live mode, clear historical and start SSE
-    untrack(() => {
-      entries = [];
-      total = 0;
-      error = null;
+    const url = buildLogStreamUrl({
+      client: resolveClientFilter(),
+      domain: filterDomain || undefined,
+      type: filterType || undefined,
     });
-
-    const url = untrack(() =>
-      buildLogStreamUrl({
-        client: filterClient || undefined,
-        domain: filterDomain || undefined,
-        type: filterType || undefined,
-      }),
-    );
 
     const es = new EventSource(url);
     eventSource = es;
@@ -186,7 +201,9 @@
     es.addEventListener("backfill", (event: MessageEvent) => {
       try {
         const backfillEntries = JSON.parse(event.data) as SidecarLogEntry[];
-        entries = [...backfillEntries].reverse().slice(0, LIVE_CAP);
+        const keyed = keyEntries([...backfillEntries].reverse().slice(0, LIVE_CAP));
+        resolveNewClients(keyed.map((e) => e.client_ip));
+        entries = keyed;
         total = entries.length;
       } catch {}
     });
@@ -194,7 +211,9 @@
     es.onmessage = (event) => {
       try {
         const entry = JSON.parse(event.data) as SidecarLogEntry;
-        entries = [entry, ...entries.slice(0, LIVE_CAP - 1)];
+        const [keyed] = keyEntries([entry]);
+        resolveNewClients([keyed.client_ip]);
+        entries = [keyed, ...entries.slice(0, LIVE_CAP - 1)];
         total = entries.length;
       } catch {}
     };
@@ -202,10 +221,19 @@
     es.onerror = () => {
       sseConnected = false;
     };
+  }
+
+  // Live mode SSE
+  $effect(() => {
+    if (!live) {
+      closeSse();
+      return;
+    }
+
+    untrack(() => connectSse());
 
     return () => {
-      es.close();
-      sseConnected = false;
+      closeSse();
     };
   });
 
@@ -217,21 +245,49 @@
     }
   }
 
-  function toggleLive() {
-    onlivechange(!live);
-  }
-
   function applyFilters() {
     if (live) {
-      // Reconnect SSE with new filters
-      closeSse();
-      onlivechange(false);
-      // Slight delay then re-enable to trigger effect
-      setTimeout(() => onlivechange(true), 50);
+      connectSse();
     } else {
       load(true);
     }
   }
+
+  let hasActiveFilters = $derived(
+    filterDomain !== "" || filterClient !== "" || filterType !== "",
+  );
+
+  function clearFilters() {
+    filterDomain = "";
+    filterClient = "";
+    filterType = "";
+    applyFilters();
+  }
+
+  function handleFilterKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyFilters();
+    }
+  }
+
+  // Auto-apply text filters after typing stops
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let filtersInitialized = false;
+  $effect(() => {
+    // Track the text filter values
+    filterDomain;
+    filterClient;
+    if (!filtersInitialized) {
+      filtersInitialized = true;
+      return;
+    }
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      untrack(() => applyFilters());
+    }, 400);
+    return () => clearTimeout(debounceTimer);
+  });
 
   const typeOptions = [
     { value: "", label: "All" },
@@ -252,62 +308,48 @@
 
 <div class="flex flex-col h-full min-h-0">
   <!-- Filters row (pinned) -->
-  <div class="shrink-0 flex flex-wrap items-end gap-3 pb-3">
-    <div class="w-40">
-      <Input bind:value={filterDomain} label="Domain" placeholder="Filter..." />
-    </div>
-    <div class="w-36">
-      <Input bind:value={filterClient} label="Client" placeholder="Filter..." />
-    </div>
-    <div>
-      <span class="mb-1 block text-sm font-medium text-text-secondary"
-        >Type</span
-      >
-      <div class="flex gap-1">
-        {#each typeOptions as opt}
-          <button
-            onclick={() => {
-              filterType = opt.value;
-              applyFilters();
-            }}
-            class="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer
-              {filterType === opt.value
-              ? 'bg-accent-600/15 text-accent-400 border border-accent-500/30'
-              : 'bg-surface-secondary text-text-secondary border border-surface-border hover:border-text-muted'}"
-          >
-            {opt.label}
-          </button>
-        {/each}
-      </div>
-    </div>
-    <button
-      onclick={applyFilters}
-      class="rounded-lg border border-surface-border bg-surface-secondary px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:border-text-muted cursor-pointer"
-    >
-      Apply
-    </button>
+  <div class="shrink-0 flex items-center gap-2 pb-3">
+    <input
+      bind:value={filterDomain}
+      onkeydown={handleFilterKeydown}
+      placeholder="Domain"
+      class="w-36 rounded-md border border-surface-border bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary
+        placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+    />
+    <input
+      bind:value={filterClient}
+      onkeydown={handleFilterKeydown}
+      placeholder="Client"
+      class="w-32 rounded-md border border-surface-border bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary
+        placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+    />
 
-    <!-- Live toggle -->
-    <button
-      onclick={toggleLive}
-      class="ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer
-        {live
-        ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30'
-        : 'bg-surface-secondary text-text-secondary border border-surface-border hover:border-text-muted'}"
-    >
-      {#if live}
-        <span class="relative flex h-2 w-2">
-          <span
-            class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
-          ></span>
-          <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-400"
-          ></span>
-        </span>
-      {:else}
-        <span class="inline-flex h-2 w-2 rounded-full bg-text-muted"></span>
-      {/if}
-      Live
-    </button>
+    <span class="mx-0.5 h-5 w-px bg-surface-border"></span>
+
+    {#each typeOptions as opt}
+      <button
+        onclick={() => {
+          filterType = opt.value;
+          applyFilters();
+        }}
+        class="rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors cursor-pointer
+          {filterType === opt.value
+          ? 'bg-accent-600/15 text-accent-400 border border-accent-500/30'
+          : 'bg-surface-secondary text-text-secondary border border-surface-border hover:border-text-muted'}"
+      >
+        {opt.label}
+      </button>
+    {/each}
+
+    {#if hasActiveFilters}
+      <button
+        onclick={clearFilters}
+        class="ml-1 rounded-md px-2 py-1.5 text-xs text-text-muted transition-colors hover:text-text-secondary cursor-pointer"
+        title="Clear all filters"
+      >
+        &times; Clear
+      </button>
+    {/if}
   </div>
 
   {#if error}
@@ -337,7 +379,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-surface-border">
-        {#each entries as entry}
+        {#each entries as entry (entry._id)}
           {@const isBlocked = entry.response_reason
             .toUpperCase()
             .startsWith("BLOCKED")}
