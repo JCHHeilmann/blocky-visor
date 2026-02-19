@@ -5,43 +5,28 @@
   import { sidecarStore } from "$lib/stores/sidecar.svelte";
 </script>
 
-<div class="space-y-6">
-  {#if !sidecarStore.configured}
-    <Card>
-      <p class="text-sm text-text-muted">
-        Configure a sidecar connection in Settings to manage Blocky
-        configuration.
-      </p>
+{#if !sidecarStore.configured}
+  <Card>
+    <p class="text-sm text-text-muted">
+      Configure a sidecar connection in Settings to manage Blocky
+      configuration.
+    </p>
+  </Card>
+{:else}
+  <div class="flex flex-col h-full gap-4 lg:flex-row">
+    <!-- Config editor (main area, fills height) -->
+    <Card class="flex-1 min-h-0 flex flex-col overflow-hidden !p-4">
+      <ConfigEditor />
     </Card>
-  {:else}
-    <div class="grid gap-6 xl:grid-cols-[1fr_320px]">
-      <!-- Config editor (main area) -->
+
+    <!-- Sidebar: service control -->
+    <div class="shrink-0 lg:w-72">
       <Card>
-        <h2 class="mb-4 text-lg font-semibold text-text-primary">
-          Configuration File
+        <h2 class="mb-4 text-sm font-semibold text-text-primary">
+          Service Status
         </h2>
-        <ConfigEditor />
+        <ServiceControl />
       </Card>
-
-      <!-- Sidebar: service control -->
-      <div class="space-y-6">
-        <Card>
-          <h2 class="mb-4 text-lg font-semibold text-text-primary">
-            Service Status
-          </h2>
-          <ServiceControl />
-        </Card>
-
-        <Card>
-          <h2 class="mb-3 text-sm font-medium text-text-secondary">Tips</h2>
-          <ul class="space-y-2 text-xs text-text-muted list-disc list-inside">
-            <li>Changes are saved with a timestamped backup</li>
-            <li>Restart Blocky after saving for changes to take effect</li>
-            <li>YAML syntax is validated before saving</li>
-            <li>Check Blocky logs after restart to verify config</li>
-          </ul>
-        </Card>
-      </div>
     </div>
-  {/if}
-</div>
+  </div>
+{/if}

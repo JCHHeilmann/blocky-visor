@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Modal from "$lib/components/ui/Modal.svelte";
+  import YamlEditor from "./YamlEditor.svelte";
   import { fetchConfig, saveConfig } from "$lib/api/sidecar-config";
   import { toastStore } from "$lib/stores/toasts.svelte";
 
@@ -50,17 +51,36 @@
   });
 </script>
 
-<div class="space-y-4">
+<div class="flex flex-col h-full min-h-0">
   {#if error}
     <div
-      class="rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-3 text-sm text-red-400"
+      class="shrink-0 rounded-lg border border-red-600/30 bg-red-600/10 px-4 py-3 text-sm text-red-400 mb-3"
     >
       {error}
     </div>
   {/if}
 
+  <!-- Toolbar -->
+  <div class="shrink-0 flex items-center gap-3 pb-3">
+    <Button
+      onclick={() => (showConfirm = true)}
+      disabled={!hasChanges}
+      loading={saving}
+    >
+      Save
+    </Button>
+    <Button variant="secondary" onclick={handleRevert} disabled={!hasChanges}>
+      Revert
+    </Button>
+    <Button variant="ghost" onclick={load}>Reload</Button>
+    {#if hasChanges}
+      <span class="text-xs text-warning">Unsaved changes</span>
+    {/if}
+  </div>
+
+  <!-- Editor -->
   {#if loading}
-    <div class="flex justify-center py-8">
+    <div class="flex-1 flex items-center justify-center">
       <svg
         class="h-6 w-6 animate-spin text-accent-600"
         viewBox="0 0 24 24"
@@ -82,29 +102,8 @@
       </svg>
     </div>
   {:else}
-    <textarea
-      bind:value={content}
-      rows={25}
-      class="w-full rounded-lg border border-surface-border bg-surface-bg p-4 font-mono text-sm text-text-primary
-				focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500 resize-y"
-      spellcheck="false"
-    ></textarea>
-
-    <div class="flex items-center gap-3">
-      <Button
-        onclick={() => (showConfirm = true)}
-        disabled={!hasChanges}
-        loading={saving}
-      >
-        Save Config
-      </Button>
-      <Button variant="secondary" onclick={handleRevert} disabled={!hasChanges}>
-        Revert Changes
-      </Button>
-      <Button variant="ghost" onclick={load}>Reload</Button>
-      {#if hasChanges}
-        <span class="text-sm text-warning">Unsaved changes</span>
-      {/if}
+    <div class="flex-1 min-h-0">
+      <YamlEditor value={content} onchange={(v) => (content = v)} />
     </div>
   {/if}
 </div>

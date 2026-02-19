@@ -32,6 +32,8 @@
   // Infinite scroll
   let sentinel: HTMLDivElement | undefined = $state();
   let scrollContainer: HTMLDivElement | undefined = $state();
+  let thead: HTMLElement | undefined = $state();
+  let theadH = $state(0);
   let observer: IntersectionObserver | undefined;
 
   // Live streaming
@@ -91,6 +93,11 @@
     offset = entries.length;
     load();
   }
+
+  // Measure thead height for sticky date separators
+  $effect(() => {
+    if (thead) theadH = thead.getBoundingClientRect().height;
+  });
 
   // Reload on range changes only (untrack load internals)
   $effect(() => {
@@ -242,23 +249,43 @@
       second: "2-digit",
     });
   }
+
+  function getDateKey(ts: string): string {
+    return new Date(ts).toDateString();
+  }
+
+  function formatDate(ts: string): string {
+    const d = new Date(ts);
+    const now = new Date();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (d.toDateString() === now.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+    return d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+  }
 </script>
 
 <div class="flex flex-col h-full min-h-0">
   <!-- Filters row (pinned) -->
   <div class="shrink-0 flex items-center gap-2 pb-3">
     <input
-      bind:value={filterDomain}
-      onkeydown={handleFilterKeydown}
-      placeholder="Domain"
-      class="w-36 rounded-md border border-surface-border bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary
-        placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
-    />
-    <input
       bind:value={filterClient}
       onkeydown={handleFilterKeydown}
       placeholder="Client"
       class="w-32 rounded-md border border-surface-border bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary
+        placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
+    />
+    <input
+      bind:value={filterDomain}
+      onkeydown={handleFilterKeydown}
+      placeholder="Domain"
+      class="w-36 rounded-md border border-surface-border bg-surface-secondary px-2.5 py-1.5 text-xs text-text-primary
         placeholder:text-text-muted focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"
     />
 
@@ -303,10 +330,18 @@
     bind:this={scrollContainer}
     class="flex-1 min-h-0 overflow-y-auto overflow-x-auto rounded-lg border border-surface-border"
   >
-    <table class="w-full text-xs">
-      <thead class="sticky top-0 z-10">
+    <table class="w-full text-xs table-fixed">
+      <colgroup>
+        <col class="w-[90px]" />
+        <col class="w-[14%]" />
+        <col />
+        <col class="w-[60px]" />
+        <col class="w-[18%]" />
+        <col class="w-[60px]" />
+      </colgroup>
+      <thead bind:this={thead} class="sticky top-0 z-10">
         <tr
-          class="border-b border-surface-border bg-surface-secondary text-left text-text-muted"
+          class="bg-surface-secondary text-left text-text-muted"
         >
           <th class="px-3 py-2 font-medium">Time</th>
           <th class="px-3 py-2 font-medium">Client</th>
@@ -316,29 +351,42 @@
           <th class="px-3 py-2 font-medium">Code</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-surface-border">
-        {#each entries as entry (entry._id)}
+      <tbody>
+        {#each entries as entry, i (entry._id)}
+          {@const prevDateKey = i > 0 ? getDateKey(entries[i - 1].timestamp) : null}
+          {@const currDateKey = getDateKey(entry.timestamp)}
+          {#if prevDateKey !== currDateKey}
+            <tr class="sticky z-[5]" style:top="{theadH}px">
+              <td
+                colspan="6"
+                class="px-3 py-1 text-xs font-medium text-text-secondary bg-surface-secondary shadow-[inset_0_1px_0_var(--color-surface-border),inset_0_-1px_0_var(--color-surface-border)]"
+              >
+                {formatDate(entry.timestamp)}
+              </td>
+            </tr>
+          {/if}
           {@const isBlocked = entry.response_reason
             .toUpperCase()
             .startsWith("BLOCKED")}
-          <tr class="hover:bg-surface-hover">
+          <tr class="border-b border-surface-border hover:bg-surface-hover">
             <td class="px-3 py-1.5 text-text-muted whitespace-nowrap font-mono"
               >{formatTime(entry.timestamp)}</td
             >
-            <td class="px-3 py-1.5 text-text-secondary whitespace-nowrap">
+            <td class="px-3 py-1.5 text-text-secondary truncate" title={clientDisplay(entry)}>
               {clientDisplay(entry)}
             </td>
             <td
-              class="px-3 py-1.5 font-mono text-text-primary max-w-xs truncate"
+              class="px-3 py-1.5 font-mono text-text-primary truncate"
+              title={stripDot(entry.domain)}
               >{stripDot(entry.domain)}</td
             >
-            <td class="px-3 py-1.5 text-text-muted">{entry.query_type}</td>
+            <td class="px-3 py-1.5 text-text-muted truncate">{entry.query_type}</td>
             <td
-              class="px-3 py-1.5 {isBlocked
+              class="px-3 py-1.5 truncate {isBlocked
                 ? 'text-red-400'
                 : 'text-text-secondary'}">{entry.response_reason}</td
             >
-            <td class="px-3 py-1.5 text-text-muted">{entry.return_code}</td>
+            <td class="px-3 py-1.5 text-text-muted truncate">{entry.return_code}</td>
           </tr>
         {/each}
       </tbody>
