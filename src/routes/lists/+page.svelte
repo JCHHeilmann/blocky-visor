@@ -50,7 +50,6 @@
       class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <h2 class="text-lg font-semibold text-text-primary">Blocking Lists</h2>
         <p class="text-sm text-text-muted">
           Refresh lists from configured sources
         </p>

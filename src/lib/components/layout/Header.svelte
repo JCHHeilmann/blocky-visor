@@ -44,7 +44,7 @@
     </svg>
   </button>
 
-  <h1 class="text-lg font-semibold text-text-primary">{title}</h1>
+  <h1 class="text-sm font-medium text-text-secondary">{title}</h1>
 
   <div class="ml-auto">
     {#if !blockingStore.initialLoad}

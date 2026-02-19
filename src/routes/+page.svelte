@@ -286,12 +286,7 @@
     <div
       class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
     >
-      <div>
-        <h2 class="text-lg font-semibold text-text-primary mb-1">
-          DNS Blocking
-        </h2>
-        <p class="text-sm text-text-muted">Control ad and tracker blocking</p>
-      </div>
+      <p class="text-sm text-text-muted">Control ad and tracker blocking</p>
       <BlockingToggle />
     </div>
   </Card>

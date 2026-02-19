@@ -67,7 +67,6 @@
 
 <div class="space-y-6">
   <Card>
-    <h2 class="mb-4 text-lg font-semibold text-text-primary">DNS Query</h2>
     <QueryForm onsubmit={handleQuery} {loading} />
   </Card>
 

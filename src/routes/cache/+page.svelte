@@ -48,10 +48,7 @@
     <div
       class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
     >
-      <div>
-        <h2 class="text-lg font-semibold text-text-primary">DNS Cache</h2>
-        <p class="text-sm text-text-muted">Manage the DNS response cache</p>
-      </div>
+      <p class="text-sm text-text-muted">Manage the DNS response cache</p>
       <Button variant="danger" onclick={() => (showConfirm = true)} {loading}>
         Flush Cache
       </Button>
