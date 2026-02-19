@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 )
@@ -65,34 +64,6 @@ func LogFilesForRange(logDir string, start, end time.Time) []string {
 	return files
 }
 
-// ProcessFilesStreaming parses log files in the date range one at a time,
-// calling fn for each entry. Entries are not retained after fn returns,
-// allowing GC to reclaim memory between files.
-func ProcessFilesStreaming(logDir string, start, end time.Time, fn func(*LogEntry)) (int, error) {
-	files := LogFilesForRange(logDir, start, end)
-	for _, path := range files {
-		f, err := os.Open(path)
-		if err != nil {
-			continue
-		}
-		scanner := bufio.NewScanner(f)
-		scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-			entry, err := ParseLine(line)
-			if err != nil {
-				continue
-			}
-			fn(entry)
-		}
-		f.Close()
-	}
-	return len(files), nil
-}
-
 // LoadEntriesForRange parses all log files in the date range and returns entries + file count.
 func LoadEntriesForRange(logDir string, start, end time.Time) ([]*LogEntry, int, error) {
 	files := LogFilesForRange(logDir, start, end)
@@ -107,76 +78,48 @@ func LoadEntriesForRange(logDir string, start, end time.Time) ([]*LogEntry, int,
 	return allEntries, len(files), nil
 }
 
+// MatchesFilter tests whether a single entry passes the filter criteria.
+func MatchesFilter(e *LogEntry, filter LogFilter) bool {
+	if filter.Client != "" {
+		cl := strings.ToLower(filter.Client)
+		if !strings.Contains(strings.ToLower(e.ClientIP), cl) &&
+			!strings.Contains(strings.ToLower(e.ClientName), cl) &&
+			!strings.Contains(strings.ToLower(e.ResolvedName), cl) {
+			return false
+		}
+	}
+	if filter.Domain != "" && !strings.Contains(strings.ToLower(e.Domain), strings.ToLower(filter.Domain)) {
+		return false
+	}
+	if filter.Type != "" {
+		switch filter.Type {
+		case "blocked":
+			if !e.IsBlocked() {
+				return false
+			}
+		case "cached":
+			if !e.IsCached() {
+				return false
+			}
+		case "resolved":
+			if e.IsBlocked() || e.IsCached() {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // FilterEntries applies a LogFilter to a set of entries.
 func FilterEntries(entries []*LogEntry, filter LogFilter) []*LogEntry {
 	if filter.Client == "" && filter.Domain == "" && filter.Type == "" {
 		return entries
 	}
-
 	var result []*LogEntry
 	for _, e := range entries {
-		if filter.Client != "" {
-			cl := strings.ToLower(filter.Client)
-			if !strings.Contains(strings.ToLower(e.ClientIP), cl) &&
-				!strings.Contains(strings.ToLower(e.ClientName), cl) &&
-				!strings.Contains(strings.ToLower(e.ResolvedName), cl) {
-				continue
-			}
+		if MatchesFilter(e, filter) {
+			result = append(result, e)
 		}
-		if filter.Domain != "" && !strings.Contains(strings.ToLower(e.Domain), strings.ToLower(filter.Domain)) {
-			continue
-		}
-		if filter.Type != "" {
-			switch filter.Type {
-			case "blocked":
-				if !e.IsBlocked() {
-					continue
-				}
-			case "cached":
-				if !e.IsCached() {
-					continue
-				}
-			case "resolved":
-				if e.IsBlocked() || e.IsCached() {
-					continue
-				}
-			}
-		}
-		result = append(result, e)
 	}
 	return result
-}
-
-// QueryLogs loads, filters, and paginates log entries in reverse chronological order.
-func QueryLogs(logDir string, start, end time.Time, filter LogFilter, limit, offset int) (*LogsResponse, error) {
-	entries, _, err := LoadEntriesForRange(logDir, start, end)
-	if err != nil {
-		return nil, err
-	}
-
-	// Apply filters
-	filtered := FilterEntries(entries, filter)
-
-	// Sort reverse chronological
-	sort.Slice(filtered, func(i, j int) bool {
-		return filtered[i].Timestamp.After(filtered[j].Timestamp)
-	})
-
-	total := len(filtered)
-
-	// Paginate
-	if offset >= total {
-		return &LogsResponse{Total: total, Offset: offset, Limit: limit, Entries: []*LogEntry{}}, nil
-	}
-	end2 := offset + limit
-	if end2 > total {
-		end2 = total
-	}
-
-	return &LogsResponse{
-		Total:   total,
-		Offset:  offset,
-		Limit:   limit,
-		Entries: filtered[offset:end2],
-	}, nil
 }

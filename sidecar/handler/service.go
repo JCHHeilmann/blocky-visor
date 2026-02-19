@@ -8,15 +8,18 @@ import (
 	"github.com/JCHHeilmann/blocky-visor/sidecar/blocky"
 )
 
+func systemdErrorStatus(err error) int {
+	if errors.Is(err, blocky.ErrSystemdNotAvailable) {
+		return http.StatusNotImplemented
+	}
+	return http.StatusInternalServerError
+}
+
 func ServiceStatus(serviceName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		info, err := blocky.Status(serviceName)
 		if err != nil {
-			status := http.StatusInternalServerError
-			if errors.Is(err, blocky.ErrSystemdNotAvailable) {
-				status = http.StatusNotImplemented
-			}
-			http.Error(w, jsonErr(err.Error()), status)
+			http.Error(w, jsonErr(err.Error()), systemdErrorStatus(err))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -27,11 +30,7 @@ func ServiceStatus(serviceName string) http.HandlerFunc {
 func ServiceRestart(serviceName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := blocky.Restart(serviceName); err != nil {
-			status := http.StatusInternalServerError
-			if errors.Is(err, blocky.ErrSystemdNotAvailable) {
-				status = http.StatusNotImplemented
-			}
-			http.Error(w, jsonErr(err.Error()), status)
+			http.Error(w, jsonErr(err.Error()), systemdErrorStatus(err))
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

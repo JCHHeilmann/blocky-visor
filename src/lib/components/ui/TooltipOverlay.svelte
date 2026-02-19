@@ -3,7 +3,6 @@
 
   let el = $state<HTMLDivElement>();
 
-  // Offset from cursor
   const OFFSET_X = 12;
   const OFFSET_Y = -8;
 
@@ -20,7 +19,7 @@
     const vh = window.innerHeight;
 
     if (x + rect.width > vw - 8) x = t.x - rect.width - OFFSET_X;
-    if (y + rect.height > vh - 8) y = t.y - rect.height - OFFSET_X;
+    if (y + rect.height > vh - 8) y = t.y - rect.height - OFFSET_Y;
     if (y < 8) y = 8;
 
     return `left:${x}px;top:${y}px`;

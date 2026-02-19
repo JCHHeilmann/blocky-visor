@@ -14,16 +14,16 @@
   let type = $state("A");
 
   const recordTypes = [
-    { value: "A", label: "A" },
-    { value: "AAAA", label: "AAAA" },
-    { value: "CNAME", label: "CNAME" },
-    { value: "MX", label: "MX" },
-    { value: "TXT", label: "TXT" },
-    { value: "NS", label: "NS" },
-    { value: "SOA", label: "SOA" },
-    { value: "SRV", label: "SRV" },
-    { value: "PTR", label: "PTR" },
-  ];
+    "A",
+    "AAAA",
+    "CNAME",
+    "MX",
+    "TXT",
+    "NS",
+    "SOA",
+    "SRV",
+    "PTR",
+  ].map((t) => ({ value: t, label: t }));
 
   function handleSubmit(e: Event) {
     e.preventDefault();

@@ -4,10 +4,14 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Design Tokens ──────────────────────────────────────────────── */
+
 @theme {
+  /* Fonts */
   --font-sans: "Inter Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", monospace;
 
+  /* Gray scale (cool gray, oklch hue 250) */
   --color-gray-50: oklch(0.985 0.002 250);
   --color-gray-100: oklch(0.967 0.003 250);
   --color-gray-200: oklch(0.928 0.006 250);
@@ -17,10 +21,10 @@
   --color-gray-600: oklch(0.446 0.014 250);
   --color-gray-700: oklch(0.372 0.013 250);
   --color-gray-800: oklch(0.279 0.01 250);
-  --color-gray-850: oklch(0.227 0.009 250);
   --color-gray-900: oklch(0.205 0.008 250);
   --color-gray-950: oklch(0.145 0.007 250);
 
+  /* Accent scale (teal/cyan, oklch hue 195) */
   --color-accent-50: oklch(0.97 0.04 195);
   --color-accent-100: oklch(0.94 0.08 195);
   --color-accent-200: oklch(0.88 0.12 195);
@@ -33,6 +37,7 @@
   --color-accent-900: oklch(0.28 0.07 195);
   --color-accent-950: oklch(0.2 0.05 195);
 
+  /* Status colors */
   --color-success: oklch(0.65 0.17 145);
   --color-warning: oklch(0.75 0.17 70);
   --color-error: oklch(0.63 0.2 25);
@@ -40,46 +45,49 @@
   /* Semantic surface tokens (dark defaults) */
   --color-surface-bg: var(--color-gray-950);
   --color-surface-primary: var(--color-gray-900);
-  --color-surface-secondary: var(--color-gray-850);
+  --color-surface-secondary: oklch(0.227 0.009 250);
   --color-surface-border: var(--color-gray-800);
   --color-surface-hover: var(--color-gray-800);
+
+  /* Semantic text tokens (dark defaults) */
   --color-text-primary: var(--color-gray-100);
   --color-text-secondary: var(--color-gray-400);
   --color-text-muted: var(--color-gray-500);
   --color-text-faint: var(--color-gray-600);
 }
 
-/* Light mode overrides */
+/* ── Light Mode ─────────────────────────────────────────────────── */
+
 :root:not(.dark) {
   --color-surface-bg: var(--color-gray-50);
   --color-surface-primary: white;
   --color-surface-secondary: var(--color-gray-100);
   --color-surface-border: var(--color-gray-200);
   --color-surface-hover: var(--color-gray-100);
+
   --color-text-primary: var(--color-gray-900);
   --color-text-secondary: var(--color-gray-600);
   --color-text-muted: var(--color-gray-500);
   --color-text-faint: var(--color-gray-400);
 }
 
-/* Shadow elevation tokens */
+/* ── Shadow Elevation Tokens ────────────────────────────────────── */
+
 :root {
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-card-hover:
-    0 4px 12px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.04);
   --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-overlay:
-    0 16px 48px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 :root.dark {
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
-  --shadow-card-hover:
-    0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
   --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.25);
-  --shadow-overlay:
-    0 16px 48px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-overlay: 0 16px 48px rgba(0, 0, 0, 0.5), 0 4px 12px rgba(0, 0, 0, 0.3);
 }
+
+/* ── Base Styles ────────────────────────────────────────────────── */
 
 body {
   font-family: var(--font-sans);
@@ -93,34 +101,21 @@ pre,
   font-family: var(--font-mono);
 }
 
-/* Keyframe animations */
+/* ── Animations ─────────────────────────────────────────────────── */
+
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes fade-in-scale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slide-in-left {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
 }
 
 @utility animate-fade-in {
@@ -135,7 +130,6 @@ pre,
   animation: slide-in-left 200ms ease-out;
 }
 
-/* Accessibility: disable animations for users who prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

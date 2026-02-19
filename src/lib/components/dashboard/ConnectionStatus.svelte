@@ -3,18 +3,18 @@
   import { settingsStore } from "$lib/stores/settings.svelte";
   import { formatRelativeTime } from "$lib/utils/formatters";
 
-  // Update the relative time display periodically
-  let now = $state(Date.now());
+  let tick = $state(0);
   $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 1000);
+    const timer = setInterval(() => tick++, 1000);
     return () => clearInterval(timer);
   });
 
-  let displayTime = $derived(
-    blockingStore.lastUpdated
+  let displayTime = $derived.by(() => {
+    void tick;
+    return blockingStore.lastUpdated
       ? formatRelativeTime(blockingStore.lastUpdated)
-      : "Never",
-  );
+      : "Never";
+  });
 </script>
 
 <div class="flex items-center gap-4 text-sm text-text-muted">

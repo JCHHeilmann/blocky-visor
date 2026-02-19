@@ -23,7 +23,7 @@
   };
 
   function handleClick() {
-    if (!disabled) onchange(!checked);
+    onchange(!checked);
   }
 </script>
 
@@ -43,7 +43,7 @@
     class="pointer-events-none inline-block transform rounded-full bg-white shadow-sm
 			ring-0 transition-transform duration-200
 			{sizes[size].thumb}
-			{checked ? sizes[size].translate : 'translate-x-0.5'}
-			mt-0.5"
+			mt-0.5
+			{checked ? sizes[size].translate : 'translate-x-0.5'}"
   ></span>
 </button>

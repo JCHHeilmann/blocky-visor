@@ -23,11 +23,7 @@
     if (!arpa) return null;
     try {
       const result = await dnsQuery(arpa, "PTR");
-      if (
-        result.returnCode === "NOERROR" &&
-        result.response &&
-        result.response !== ""
-      ) {
+      if (result.returnCode === "NOERROR" && result.response) {
         // Response format: "PTR (hostname.local.)" — extract hostname from parens
         const match = result.response.match(/PTR\s*\(([^)]+)\)/);
         if (match) return match[1].replace(/\.$/, "");

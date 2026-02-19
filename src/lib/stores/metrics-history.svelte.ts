@@ -16,6 +16,16 @@ const MAX_SNAPSHOTS = 30;
 function createMetricsHistoryStore() {
   let snapshots = $state<MetricsSnapshot[]>([]);
 
+  function latestDelta(
+    extract: (m: ParsedMetrics) => number,
+  ): number | undefined {
+    if (snapshots.length < 2) return undefined;
+    const prev = snapshots[snapshots.length - 2].metrics;
+    const curr = snapshots[snapshots.length - 1].metrics;
+    const delta = extract(curr) - extract(prev);
+    return delta >= 0 ? delta : undefined;
+  }
+
   function push(metrics: ParsedMetrics) {
     snapshots = [...snapshots, { timestamp: Date.now(), metrics }].slice(
       -MAX_SNAPSHOTS,
@@ -57,21 +67,11 @@ function createMetricsHistoryStore() {
     },
 
     get queriesPerInterval(): number | undefined {
-      if (snapshots.length < 2) return undefined;
-      const prev = snapshots[snapshots.length - 2].metrics;
-      const curr = snapshots[snapshots.length - 1].metrics;
-      const delta = (curr.totalQueries ?? 0) - (prev.totalQueries ?? 0);
-      return delta >= 0 ? delta : undefined;
+      return latestDelta((m) => m.totalQueries ?? 0);
     },
 
     get blockedPerInterval(): number | undefined {
-      if (snapshots.length < 2) return undefined;
-      const prev = snapshots[snapshots.length - 2].metrics;
-      const curr = snapshots[snapshots.length - 1].metrics;
-      const delta =
-        sumBlockedResponses(curr.responsesByReason) -
-        sumBlockedResponses(prev.responsesByReason);
-      return delta >= 0 ? delta : undefined;
+      return latestDelta((m) => sumBlockedResponses(m.responsesByReason));
     },
 
     push,

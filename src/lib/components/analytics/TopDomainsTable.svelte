@@ -61,8 +61,6 @@
           </div>
           {#if showReason && entry.reason}
             <span class="text-[10px] text-text-faint">{entry.reason}</span>
-          {:else if showReason}
-            <span class="text-[10px]">&nbsp;</span>
           {:else}
             <span class="text-[10px]">&nbsp;</span>
           {/if}

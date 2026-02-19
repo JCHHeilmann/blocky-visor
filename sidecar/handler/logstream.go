@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
@@ -58,7 +59,7 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 				if name := hr.Lookup(entry.ClientIP); name != "" {
 					entry.ResolvedName = name
 				}
-				if matchesFilter(entry, filter) {
+				if logparser.MatchesFilter(entry, filter) {
 					allFiltered = append(allFiltered, entry)
 				}
 			}
@@ -143,7 +144,7 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 					if name := hr.Lookup(entry.ClientIP); name != "" {
 						entry.ResolvedName = name
 					}
-					if !matchesFilter(entry, filter) {
+					if !logparser.MatchesFilter(entry, filter) {
 						continue
 					}
 					data, err := json.Marshal(entry)
@@ -159,22 +160,9 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 }
 
 func splitLines(data []byte) []string {
-	var lines []string
-	start := 0
-	for i, b := range data {
-		if b == '\n' {
-			line := string(data[start:i])
-			if len(line) > 0 && line[len(line)-1] == '\r' {
-				line = line[:len(line)-1]
-			}
-			lines = append(lines, line)
-			start = i + 1
-		}
+	lines := strings.Split(string(data), "\n")
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
 	}
 	return lines
-}
-
-func matchesFilter(entry *logparser.LogEntry, filter logparser.LogFilter) bool {
-	filtered := logparser.FilterEntries([]*logparser.LogEntry{entry}, filter)
-	return len(filtered) > 0
 }

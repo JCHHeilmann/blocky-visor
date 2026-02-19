@@ -31,40 +31,24 @@ func Status(serviceName string) (*ServiceInfo, error) {
 	if !SystemdAvailable() {
 		return nil, ErrSystemdNotAvailable
 	}
-	// Get full status output
+
 	out, _ := exec.Command("systemctl", "status", serviceName).CombinedOutput()
-	fullStatus := string(out)
+	info := &ServiceInfo{FullStatus: string(out)}
 
-	info := &ServiceInfo{FullStatus: fullStatus}
-
-	// Parse active state
-	activeOut, err := exec.Command("systemctl", "show", serviceName, "--property=ActiveState").Output()
-	if err == nil {
-		info.Active = strings.TrimPrefix(strings.TrimSpace(string(activeOut)), "ActiveState=")
+	propsOut, err := exec.Command("systemctl", "show", serviceName,
+		"--property=ActiveState,SubState,MainPID,MemoryCurrent").Output()
+	if err != nil {
+		return info, nil
 	}
 
-	// Parse sub state
-	subOut, err := exec.Command("systemctl", "show", serviceName, "--property=SubState").Output()
-	if err == nil {
-		info.SubState = strings.TrimPrefix(strings.TrimSpace(string(subOut)), "SubState=")
+	props := parseProperties(string(propsOut))
+	info.Active = props["ActiveState"]
+	info.SubState = props["SubState"]
+	if pid := props["MainPID"]; pid != "0" {
+		info.PID = pid
 	}
-
-	// Parse main PID
-	pidOut, err := exec.Command("systemctl", "show", serviceName, "--property=MainPID").Output()
-	if err == nil {
-		pid := strings.TrimPrefix(strings.TrimSpace(string(pidOut)), "MainPID=")
-		if pid != "0" {
-			info.PID = pid
-		}
-	}
-
-	// Parse memory
-	memOut, err := exec.Command("systemctl", "show", serviceName, "--property=MemoryCurrent").Output()
-	if err == nil {
-		mem := strings.TrimPrefix(strings.TrimSpace(string(memOut)), "MemoryCurrent=")
-		if mem != "" && mem != "[not set]" {
-			info.Memory = formatBytes(mem)
-		}
+	if mem := props["MemoryCurrent"]; mem != "" && mem != "[not set]" {
+		info.Memory = formatBytes(mem)
 	}
 
 	return info, nil
@@ -82,8 +66,18 @@ func Restart(serviceName string) error {
 	return nil
 }
 
+func parseProperties(output string) map[string]string {
+	props := make(map[string]string)
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if ok {
+			props[key] = value
+		}
+	}
+	return props
+}
+
 func formatBytes(s string) string {
-	// MemoryCurrent is in bytes as a string
 	var bytes uint64
 	if _, err := fmt.Sscanf(s, "%d", &bytes); err != nil {
 		return s

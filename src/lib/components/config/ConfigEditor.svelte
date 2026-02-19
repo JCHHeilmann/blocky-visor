@@ -1,6 +1,7 @@
 <script lang="ts">
   import Button from "$lib/components/ui/Button.svelte";
   import Modal from "$lib/components/ui/Modal.svelte";
+  import Spinner from "$lib/components/ui/Spinner.svelte";
   import YamlEditor from "./YamlEditor.svelte";
   import { fetchConfig, saveConfig } from "$lib/api/sidecar-config";
   import { toastStore } from "$lib/stores/toasts.svelte";
@@ -60,7 +61,6 @@
     </div>
   {/if}
 
-  <!-- Toolbar -->
   <div class="shrink-0 flex items-center gap-3 pb-3">
     <Button
       onclick={() => (showConfirm = true)}
@@ -78,28 +78,9 @@
     {/if}
   </div>
 
-  <!-- Editor -->
   {#if loading}
     <div class="flex-1 flex items-center justify-center">
-      <svg
-        class="h-6 w-6 animate-spin text-accent-600"
-        viewBox="0 0 24 24"
-        fill="none"
-      >
-        <circle
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          stroke-width="4"
-          class="opacity-25"
-        />
-        <path
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-          class="opacity-75"
-        />
-      </svg>
+      <Spinner />
     </div>
   {:else}
     <div class="flex-1 min-h-0">

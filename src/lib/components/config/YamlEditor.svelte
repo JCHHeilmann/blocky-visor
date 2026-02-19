@@ -44,10 +44,8 @@
   }
 
   function highlightValue(raw: string): string {
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed === "") return escapeHtml(raw);
+    if (!raw.trim()) return escapeHtml(raw);
 
-    // Inline comment after value
     const commentIdx = raw.indexOf(" #");
     if (commentIdx > 0) {
       const before = raw.slice(0, commentIdx);
@@ -58,90 +56,79 @@
       );
     }
 
-    // Quoted strings
     if (/^\s*["']/.test(raw)) {
       return `<span class="yl-string">${escapeHtml(raw)}</span>`;
     }
 
-    // Booleans
     if (/^\s*(true|false|yes|no|on|off)$/i.test(raw)) {
       return `<span class="yl-bool">${escapeHtml(raw)}</span>`;
     }
 
-    // Null
     if (/^\s*(null|~)$/i.test(raw)) {
       return `<span class="yl-null">${escapeHtml(raw)}</span>`;
     }
 
-    // Numbers
-    if (/^\s*-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(trimmed)) {
+    const trimmed = raw.trim();
+
+    if (/^-?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(trimmed)) {
       return `<span class="yl-number">${escapeHtml(raw)}</span>`;
     }
 
-    // Duration-like values (e.g. 5m, 1h, 30s)
-    if (/^\s*\d+[smhd]$/i.test(trimmed)) {
+    if (/^\d+[smhd]$/i.test(trimmed)) {
       return `<span class="yl-number">${escapeHtml(raw)}</span>`;
     }
 
     return `<span class="yl-value">${escapeHtml(raw)}</span>`;
   }
 
+  function highlightLine(line: string): string {
+    if (/^\s*#/.test(line)) {
+      return `<span class="yl-comment">${escapeHtml(line)}</span>`;
+    }
+
+    if (/^---\s*$/.test(line) || /^\.\.\.\s*$/.test(line)) {
+      return `<span class="yl-doc">${escapeHtml(line)}</span>`;
+    }
+
+    const kvMatch = line.match(/^(\s*)([\w][\w.\-/]*)(:\s*)(.*)/);
+    if (kvMatch) {
+      const [, indent, key, colon, rest] = kvMatch;
+      return (
+        escapeHtml(indent) +
+        `<span class="yl-key">${escapeHtml(key)}</span>` +
+        `<span class="yl-colon">${escapeHtml(colon)}</span>` +
+        (rest ? highlightValue(rest) : "")
+      );
+    }
+
+    const listKvMatch = line.match(/^(\s*)(- )(\s*)([\w][\w.\-/]*)(:\s*)(.*)/);
+    if (listKvMatch) {
+      const [, indent, dash, space, key, colon, rest] = listKvMatch;
+      return (
+        escapeHtml(indent) +
+        `<span class="yl-dash">${escapeHtml(dash)}</span>` +
+        escapeHtml(space) +
+        `<span class="yl-key">${escapeHtml(key)}</span>` +
+        `<span class="yl-colon">${escapeHtml(colon)}</span>` +
+        (rest ? highlightValue(rest) : "")
+      );
+    }
+
+    const listMatch = line.match(/^(\s*)(- )(.*)/);
+    if (listMatch) {
+      const [, indent, dash, rest] = listMatch;
+      return (
+        escapeHtml(indent) +
+        `<span class="yl-dash">${escapeHtml(dash)}</span>` +
+        highlightValue(rest)
+      );
+    }
+
+    return escapeHtml(line);
+  }
+
   function highlightYaml(code: string): string {
-    return code
-      .split("\n")
-      .map((line) => {
-        // Full-line comment
-        if (/^\s*#/.test(line)) {
-          return `<span class="yl-comment">${escapeHtml(line)}</span>`;
-        }
-
-        // Document markers
-        if (/^---\s*$/.test(line) || /^\.\.\.\s*$/.test(line)) {
-          return `<span class="yl-doc">${escapeHtml(line)}</span>`;
-        }
-
-        // Key: value pairs
-        const kvMatch = line.match(/^(\s*)([\w][\w.\-/]*)(:\s*)(.*)/);
-        if (kvMatch) {
-          const [, indent, key, colon, rest] = kvMatch;
-          const highlighted =
-            escapeHtml(indent) +
-            `<span class="yl-key">${escapeHtml(key)}</span>` +
-            `<span class="yl-colon">${escapeHtml(colon)}</span>` +
-            (rest ? highlightValue(rest) : "");
-          return highlighted;
-        }
-
-        // List items with key: value
-        const listKvMatch = line.match(
-          /^(\s*)(- )(\s*)([\w][\w.\-/]*)(:\s*)(.*)/,
-        );
-        if (listKvMatch) {
-          const [, indent, dash, space, key, colon, rest] = listKvMatch;
-          return (
-            escapeHtml(indent) +
-            `<span class="yl-dash">${escapeHtml(dash)}</span>` +
-            escapeHtml(space) +
-            `<span class="yl-key">${escapeHtml(key)}</span>` +
-            `<span class="yl-colon">${escapeHtml(colon)}</span>` +
-            (rest ? highlightValue(rest) : "")
-          );
-        }
-
-        // Plain list items
-        const listMatch = line.match(/^(\s*)(- )(.*)/);
-        if (listMatch) {
-          const [, indent, dash, rest] = listMatch;
-          return (
-            escapeHtml(indent) +
-            `<span class="yl-dash">${escapeHtml(dash)}</span>` +
-            highlightValue(rest)
-          );
-        }
-
-        return escapeHtml(line);
-      })
-      .join("\n");
+    return code.split("\n").map(highlightLine).join("\n");
   }
 
   let highlighted = $derived(highlightYaml(value));

@@ -32,11 +32,7 @@
     if (!arpa) return null;
     try {
       const result = await dnsQuery(arpa, "PTR");
-      if (
-        result.returnCode === "NOERROR" &&
-        result.response &&
-        result.response !== ""
-      ) {
+      if (result.returnCode === "NOERROR" && result.response) {
         const match = result.response.match(/PTR\s*\(([^)]+)\)/);
         if (match) return match[1].replace(/\.$/, "");
         return result.response.replace(/\.$/, "").trim();

@@ -146,21 +146,21 @@
     }));
   });
 
-  let chartTitle = $derived(
-    range === "7d"
-      ? "Daily Breakdown (7 Days)"
-      : range === "30d"
-        ? "Daily Breakdown (30 Days)"
-        : range === "yesterday"
-          ? "Hourly Breakdown (Yesterday)"
-          : "Hourly Breakdown (Today)",
-  );
+  const CHART_TITLES: Record<StatsRange, string> = {
+    today: "Hourly Breakdown (Today)",
+    yesterday: "Hourly Breakdown (Yesterday)",
+    "7d": "Daily Breakdown (7 Days)",
+    "30d": "Daily Breakdown (30 Days)",
+  };
+  let chartTitle = $derived(CHART_TITLES[range]);
 
+  const RETURN_CODE_COLORS: Record<string, string> = {
+    NOERROR: "bg-emerald-500/70",
+    NXDOMAIN: "bg-amber-500/70",
+    SERVFAIL: "bg-red-500/70",
+  };
   function returnCodeColor(key: string): string {
-    if (key === "NOERROR") return "bg-emerald-500/70";
-    if (key === "NXDOMAIN") return "bg-amber-500/70";
-    if (key === "SERVFAIL") return "bg-red-500/70";
-    return "bg-blue-500/70";
+    return RETURN_CODE_COLORS[key] ?? "bg-blue-500/70";
   }
 
   function formatPeriodDate(iso: string): string {
@@ -279,6 +279,12 @@
         : undefined,
   );
 </script>
+
+{#snippet loadingOverlay()}
+  {#if sidecarLoading}
+    <div class="absolute inset-0 z-10 rounded-lg bg-surface-primary/60"></div>
+  {/if}
+{/snippet}
 
 <div class="space-y-6">
   <!-- Blocking toggle -->
@@ -419,9 +425,7 @@
             <CardSkeleton lines={5} />
           {:else if sidecarStats}
             <div class="relative">
-              {#if sidecarLoading}<div
-                  class="absolute inset-0 z-10 rounded-lg bg-surface-primary/60"
-                ></div>{/if}
+              {@render loadingOverlay()}
               <ResponseBreakdownChart
                 categories={sidecarStats.response_categories}
               />
@@ -438,9 +442,7 @@
             <CardSkeleton lines={5} />
           {:else if sidecarStats}
             <div class="relative">
-              {#if sidecarLoading}<div
-                  class="absolute inset-0 z-10 rounded-lg bg-surface-primary/60"
-                ></div>{/if}
+              {@render loadingOverlay()}
               <ClientBreakdown clients={sidecarStats.clients} />
             </div>
           {/if}

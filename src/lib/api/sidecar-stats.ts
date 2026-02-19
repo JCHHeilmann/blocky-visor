@@ -34,12 +34,9 @@ export async function fetchLogs(
   } = {},
 ): Promise<SidecarLogsResponse> {
   const searchParams = new URLSearchParams();
-  if (params.range) searchParams.set("range", params.range);
-  if (params.limit) searchParams.set("limit", String(params.limit));
-  if (params.offset) searchParams.set("offset", String(params.offset));
-  if (params.client) searchParams.set("client", params.client);
-  if (params.domain) searchParams.set("domain", params.domain);
-  if (params.type) searchParams.set("type", params.type);
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null) searchParams.set(key, String(value));
+  }
 
   const qs = searchParams.toString();
   return sidecarRequest<SidecarLogsResponse>(`/api/logs${qs ? `?${qs}` : ""}`);

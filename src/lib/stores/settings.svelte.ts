@@ -1,6 +1,7 @@
 const STORAGE_KEY = "blocky-visor-settings";
+const API_URL_KEY = "blocky-api-url";
 
-const DEFAULTS = {
+const DEFAULTS: Settings = {
   apiUrl: "http://localhost:4000",
   refreshInterval: 5,
   metricsInterval: 30,
@@ -25,20 +26,22 @@ function loadSettings(): Settings {
   return { ...DEFAULTS };
 }
 
-function saveSettings(settings: Settings) {
+function persist(settings: Settings): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-  // Also keep the api URL in the key the client reads
-  localStorage.setItem("blocky-api-url", settings.apiUrl);
+  localStorage.setItem(API_URL_KEY, settings.apiUrl);
 }
 
 function createSettingsStore() {
   let settings = $state<Settings>(loadSettings());
 
-  // Sync api URL on init
   if (typeof window !== "undefined") {
-    const initial = loadSettings();
-    localStorage.setItem("blocky-api-url", initial.apiUrl);
+    localStorage.setItem(API_URL_KEY, settings.apiUrl);
+  }
+
+  function update<K extends keyof Settings>(key: K, value: Settings[K]): void {
+    settings[key] = value;
+    persist(settings);
   }
 
   return {
@@ -46,43 +49,38 @@ function createSettingsStore() {
       return settings.apiUrl;
     },
     set apiUrl(value: string) {
-      settings.apiUrl = value;
-      saveSettings(settings);
+      update("apiUrl", value);
     },
     get refreshInterval() {
       return settings.refreshInterval;
     },
     set refreshInterval(value: number) {
-      settings.refreshInterval = value;
-      saveSettings(settings);
+      update("refreshInterval", value);
     },
     get metricsInterval() {
       return settings.metricsInterval;
     },
     set metricsInterval(value: number) {
-      settings.metricsInterval = value;
-      saveSettings(settings);
+      update("metricsInterval", value);
     },
     get sidecarUrl() {
       return settings.sidecarUrl;
     },
     set sidecarUrl(value: string) {
-      settings.sidecarUrl = value;
-      saveSettings(settings);
+      update("sidecarUrl", value);
     },
     get sidecarApiKey() {
       return settings.sidecarApiKey;
     },
     set sidecarApiKey(value: string) {
-      settings.sidecarApiKey = value;
-      saveSettings(settings);
+      update("sidecarApiKey", value);
     },
     get sidecarConfigured() {
       return settings.sidecarUrl !== "" && settings.sidecarApiKey !== "";
     },
     resetDefaults() {
       settings = { ...DEFAULTS };
-      saveSettings(settings);
+      persist(settings);
     },
   };
 }

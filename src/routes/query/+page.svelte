@@ -57,10 +57,9 @@
     localStorage.removeItem(HISTORY_KEY);
   }
 
-  // For updating relative times
-  let now = $state(Date.now());
+  let tick = $state(0);
   $effect(() => {
-    const timer = setInterval(() => (now = Date.now()), 10000);
+    const timer = setInterval(() => tick++, 10000);
     return () => clearInterval(timer);
   });
 </script>
@@ -122,7 +121,7 @@
               {entry.response.returnCode}
             </span>
             <span class="ml-auto text-xs text-text-faint"
-              >{formatRelativeTime(entry.timestamp)}</span
+              >{(void tick, formatRelativeTime(entry.timestamp))}</span
             >
           </button>
         {/each}

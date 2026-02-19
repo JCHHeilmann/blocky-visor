@@ -4,11 +4,6 @@ export interface BlockingStatus {
   autoEnableInSec?: number;
 }
 
-export interface DnsQueryRequest {
-  domain: string;
-  type: string;
-}
-
 export interface DnsQueryResponse {
   reason: string;
   response: string;
@@ -107,22 +102,21 @@ export interface SidecarServiceStatus {
 }
 
 export class ConnectionError extends Error {
-  constructor(
-    message: string,
-    public cause?: unknown,
-  ) {
-    super(message);
-    this.name = "ConnectionError";
+  override name = "ConnectionError";
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options);
   }
 }
 
 export class ApiError extends Error {
+  override name = "ApiError";
+
   constructor(
     message: string,
     public status: number,
     public body?: string,
   ) {
     super(message);
-    this.name = "ApiError";
   }
 }

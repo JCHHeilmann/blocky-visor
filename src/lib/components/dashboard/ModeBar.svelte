@@ -19,6 +19,17 @@
     uptimeLabel,
     periodLabel,
   }: Props = $props();
+
+  const BASE_BTN =
+    "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer border";
+  const ACTIVE_BTN =
+    "bg-accent-600/15 text-accent-600 dark:text-accent-400 border-accent-500/30";
+  const INACTIVE_BTN =
+    "bg-surface-secondary text-text-secondary border-surface-border hover:border-text-muted";
+
+  function buttonClass(active: boolean): string {
+    return `${BASE_BTN} ${active ? ACTIVE_BTN : INACTIVE_BTN}`;
+  }
 </script>
 
 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -26,19 +37,11 @@
     <div class="flex gap-1">
       <button
         onclick={() => onmodechange("live")}
-        class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer
-				  {mode === 'live'
-          ? 'bg-accent-600/15 text-accent-600 dark:text-accent-400 border border-accent-500/30'
-          : 'bg-surface-secondary text-text-secondary border border-surface-border hover:border-text-muted'}"
-        >Live</button
+        class={buttonClass(mode === "live")}>Live</button
       >
       <button
         onclick={() => onmodechange("historical")}
-        class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer
-				  {mode === 'historical'
-          ? 'bg-accent-600/15 text-accent-600 dark:text-accent-400 border border-accent-500/30'
-          : 'bg-surface-secondary text-text-secondary border border-surface-border hover:border-text-muted'}"
-        >Historical</button
+        class={buttonClass(mode === "historical")}>Historical</button
       >
     </div>
 

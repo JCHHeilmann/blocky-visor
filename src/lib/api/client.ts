@@ -7,85 +7,64 @@ function getBaseUrl(): string {
   return localStorage.getItem("blocky-api-url") || "http://localhost:4000";
 }
 
-export async function apiRequest<T>(
-  path: string,
+async function fetchWithTimeout(
+  url: string,
   options: RequestInit & { timeout?: number } = {},
-): Promise<T> {
+): Promise<Response> {
   const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
-  const url = `${getBaseUrl()}${path}`;
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...fetchOptions.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
-      throw new ApiError(
-        `API error: ${response.status}`,
-        response.status,
-        body,
-      );
-    }
-
-    const contentType = response.headers.get("content-type");
-    if (contentType?.includes("application/json")) {
-      return (await response.json()) as T;
-    }
-    return (await response.text()) as unknown as T;
+    return await fetch(url, { ...fetchOptions, signal: controller.signal });
   } catch (err) {
-    if (err instanceof ApiError) throw err;
     if (err instanceof DOMException && err.name === "AbortError") {
       throw new ConnectionError("Request timed out");
     }
-    throw new ConnectionError("Failed to connect to Blocky", err);
+    throw new ConnectionError("Failed to connect to Blocky", { cause: err });
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function apiRequest<T>(
+  path: string,
+  options: RequestInit & { timeout?: number } = {},
+): Promise<T> {
+  const { timeout, ...fetchOptions } = options;
+  const response = await fetchWithTimeout(`${getBaseUrl()}${path}`, {
+    timeout,
+    ...fetchOptions,
+    headers: {
+      "Content-Type": "application/json",
+      ...fetchOptions.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new ApiError(`API error: ${response.status}`, response.status, body);
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (contentType?.includes("application/json")) {
+    return (await response.json()) as T;
+  }
+  return (await response.text()) as unknown as T;
 }
 
 export async function apiRequestRaw(
   path: string,
   options: RequestInit & { timeout?: number } = {},
 ): Promise<Response> {
-  const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
-  const url = `${getBaseUrl()}${path}`;
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const response = await fetch(url, {
-      ...fetchOptions,
-      signal: controller.signal,
-    });
-    return response;
-  } catch (err) {
-    if (err instanceof DOMException && err.name === "AbortError") {
-      throw new ConnectionError("Request timed out");
-    }
-    throw new ConnectionError("Failed to connect to Blocky", err);
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetchWithTimeout(`${getBaseUrl()}${path}`, options);
 }
 
 export async function testConnection(baseUrl: string): Promise<boolean> {
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(`${baseUrl}/api/blocking/status`, {
-      signal: controller.signal,
+    const response = await fetchWithTimeout(`${baseUrl}/api/blocking/status`, {
+      timeout: 5000,
     });
-    clearTimeout(timer);
     return response.ok;
   } catch {
     return false;

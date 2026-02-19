@@ -7,15 +7,15 @@ import (
 )
 
 type StatsResponse struct {
-	Period             Period              `json:"period"`
-	Summary            Summary             `json:"summary"`
-	Hourly             []HourlyBucket      `json:"hourly"`
-	TopDomains         []DomainCount       `json:"top_domains"`
-	TopBlocked         []BlockedDomain     `json:"top_blocked"`
-	Clients            []ClientStats       `json:"clients"`
-	QueryTypes         map[string]int      `json:"query_types"`
-	ResponseCategories map[string]int      `json:"response_categories"`
-	ReturnCodes        map[string]int      `json:"return_codes"`
+	Period             Period          `json:"period"`
+	Summary            Summary         `json:"summary"`
+	Hourly             []HourlyBucket  `json:"hourly"`
+	TopDomains         []DomainCount   `json:"top_domains"`
+	TopBlocked         []BlockedDomain `json:"top_blocked"`
+	Clients            []ClientStats   `json:"clients"`
+	QueryTypes         map[string]int  `json:"query_types"`
+	ResponseCategories map[string]int  `json:"response_categories"`
+	ReturnCodes        map[string]int  `json:"return_codes"`
 }
 
 type Period struct {
@@ -74,7 +74,6 @@ type StatsAccumulator struct {
 	domainCounts       map[string]int
 	blockedDomains     map[string]*BlockedDomain
 	clientMap          map[string]*ClientStats
-	uniqueDomains      map[string]struct{}
 	queryTypes         map[string]int
 	responseCategories map[string]int
 	returnCodes        map[string]int
@@ -92,7 +91,6 @@ func NewStatsAccumulator(start, end time.Time) *StatsAccumulator {
 		domainCounts:       make(map[string]int),
 		blockedDomains:     make(map[string]*BlockedDomain),
 		clientMap:          make(map[string]*ClientStats),
-		uniqueDomains:      make(map[string]struct{}),
 		queryTypes:         make(map[string]int),
 		responseCategories: make(map[string]int),
 		returnCodes:        make(map[string]int),
@@ -129,7 +127,6 @@ func (a *StatsAccumulator) Add(e *LogEntry) {
 
 	// Domains
 	a.domainCounts[e.Domain]++
-	a.uniqueDomains[e.Domain] = struct{}{}
 
 	// Blocked domains
 	if blocked {
@@ -183,9 +180,6 @@ func (a *StatsAccumulator) Merge(other *StatsAccumulator) {
 	for k, v := range other.domainCounts {
 		a.domainCounts[k] += v
 	}
-	for k := range other.uniqueDomains {
-		a.uniqueDomains[k] = struct{}{}
-	}
 	for k, v := range other.queryTypes {
 		a.queryTypes[k] += v
 	}
@@ -235,7 +229,7 @@ func (a *StatsAccumulator) Finalize(filesParsed int) *StatsResponse {
 		TotalQueries:   a.totalQueries,
 		BlockedQueries: a.blockedQueries,
 		CachedQueries:  a.cachedQueries,
-		UniqueDomains:  len(a.uniqueDomains),
+		UniqueDomains:  len(a.domainCounts),
 		UniqueClients:  len(a.clientMap),
 	}
 

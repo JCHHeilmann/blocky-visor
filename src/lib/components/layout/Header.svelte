@@ -46,25 +46,20 @@
 
   <h1 class="text-sm font-medium text-text-secondary">{title}</h1>
 
-  <div class="ml-auto">
-    {#if !blockingStore.initialLoad}
-      {#if blockingStore.enabled}
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-xs font-medium text-green-600 dark:text-green-400"
-        >
-          <span class="h-1.5 w-1.5 rounded-full bg-green-500 dark:bg-green-400"
-          ></span>
-          Blocking Active
-        </span>
-      {:else}
-        <span
-          class="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400"
-        >
-          <span class="h-1.5 w-1.5 rounded-full bg-red-500 dark:bg-red-400"
-          ></span>
-          Blocking Disabled
-        </span>
-      {/if}
-    {/if}
-  </div>
+  {#if !blockingStore.initialLoad}
+    {@const active = blockingStore.enabled}
+    <span
+      class="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium
+        {active
+        ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+        : 'bg-red-500/10 text-red-600 dark:text-red-400'}"
+    >
+      <span
+        class="h-1.5 w-1.5 rounded-full {active
+          ? 'bg-green-500 dark:bg-green-400'
+          : 'bg-red-500 dark:bg-red-400'}"
+      ></span>
+      {active ? "Blocking Active" : "Blocking Disabled"}
+    </span>
+  {/if}
 </header>
