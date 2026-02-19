@@ -11,7 +11,11 @@
 
 <div class="flex flex-col h-full">
   <div class="shrink-0 flex justify-end items-center gap-1.5 pb-4">
-    <div class="flex gap-1.5" class:opacity-40={live} class:pointer-events-none={live}>
+    <div
+      class="flex gap-1.5"
+      class:opacity-40={live}
+      class:pointer-events-none={live}
+    >
       <DateRangeSelector value={range} onchange={(r) => (range = r)} />
     </div>
 

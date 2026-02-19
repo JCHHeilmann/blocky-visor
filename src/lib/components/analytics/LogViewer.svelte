@@ -148,7 +148,9 @@
     es.addEventListener("backfill", (event: MessageEvent) => {
       try {
         const backfillEntries = JSON.parse(event.data) as SidecarLogEntry[];
-        const keyed = keyEntries([...backfillEntries].reverse().slice(0, LIVE_CAP));
+        const keyed = keyEntries(
+          [...backfillEntries].reverse().slice(0, LIVE_CAP),
+        );
         entries = keyed;
         total = entries.length;
       } catch {}
@@ -340,9 +342,7 @@
         <col class="w-[60px]" />
       </colgroup>
       <thead bind:this={thead} class="sticky top-0 z-10">
-        <tr
-          class="bg-surface-secondary text-left text-text-muted"
-        >
+        <tr class="bg-surface-secondary text-left text-text-muted">
           <th class="px-3 py-2 font-medium">Time</th>
           <th class="px-3 py-2 font-medium">Client</th>
           <th class="px-3 py-2 font-medium">Domain</th>
@@ -353,7 +353,8 @@
       </thead>
       <tbody>
         {#each entries as entry, i (entry._id)}
-          {@const prevDateKey = i > 0 ? getDateKey(entries[i - 1].timestamp) : null}
+          {@const prevDateKey =
+            i > 0 ? getDateKey(entries[i - 1].timestamp) : null}
           {@const currDateKey = getDateKey(entry.timestamp)}
           {#if prevDateKey !== currDateKey}
             <tr class="sticky z-[5]" style:top="{theadH}px">
@@ -372,21 +373,27 @@
             <td class="px-3 py-1.5 text-text-muted whitespace-nowrap font-mono"
               >{formatTime(entry.timestamp)}</td
             >
-            <td class="px-3 py-1.5 text-text-secondary truncate" title={clientDisplay(entry)}>
+            <td
+              class="px-3 py-1.5 text-text-secondary truncate"
+              title={clientDisplay(entry)}
+            >
               {clientDisplay(entry)}
             </td>
             <td
               class="px-3 py-1.5 font-mono text-text-primary truncate"
-              title={stripDot(entry.domain)}
-              >{stripDot(entry.domain)}</td
+              title={stripDot(entry.domain)}>{stripDot(entry.domain)}</td
             >
-            <td class="px-3 py-1.5 text-text-muted truncate">{entry.query_type}</td>
+            <td class="px-3 py-1.5 text-text-muted truncate"
+              >{entry.query_type}</td
+            >
             <td
               class="px-3 py-1.5 truncate {isBlocked
                 ? 'text-red-400'
                 : 'text-text-secondary'}">{entry.response_reason}</td
             >
-            <td class="px-3 py-1.5 text-text-muted truncate">{entry.return_code}</td>
+            <td class="px-3 py-1.5 text-text-muted truncate"
+              >{entry.return_code}</td
+            >
           </tr>
         {/each}
       </tbody>

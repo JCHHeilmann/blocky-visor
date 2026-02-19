@@ -8,8 +8,7 @@
 {#if !sidecarStore.configured}
   <Card>
     <p class="text-sm text-text-muted">
-      Configure a sidecar connection in Settings to manage Blocky
-      configuration.
+      Configure a sidecar connection in Settings to manage Blocky configuration.
     </p>
   </Card>
 {:else}

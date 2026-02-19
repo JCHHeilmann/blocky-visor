@@ -52,7 +52,10 @@
     if (commentIdx > 0) {
       const before = raw.slice(0, commentIdx);
       const comment = raw.slice(commentIdx);
-      return highlightValue(before) + `<span class="yl-comment">${escapeHtml(comment)}</span>`;
+      return (
+        highlightValue(before) +
+        `<span class="yl-comment">${escapeHtml(comment)}</span>`
+      );
     }
 
     // Quoted strings
@@ -110,7 +113,9 @@
         }
 
         // List items with key: value
-        const listKvMatch = line.match(/^(\s*)(- )(\s*)([\w][\w.\-/]*)(:\s*)(.*)/);
+        const listKvMatch = line.match(
+          /^(\s*)(- )(\s*)([\w][\w.\-/]*)(:\s*)(.*)/,
+        );
         if (listKvMatch) {
           const [, indent, dash, space, key, colon, rest] = listKvMatch;
           return (
@@ -146,8 +151,7 @@
   <pre
     bind:this={pre}
     class="yaml-highlight"
-    aria-hidden="true"
-  >{@html highlighted + "\n"}</pre>
+    aria-hidden="true">{@html highlighted + "\n"}</pre>
   <textarea
     bind:this={textarea}
     {value}
