@@ -16,40 +16,43 @@ Open-source static SPA dashboard for [Blocky](https://github.com/0xERR0R/blocky)
 - `npm run build` — produce static files in `build/`
 - `npm run preview` — preview production build
 - `npm run check` — run svelte-check
+- `npm run check:watch` — run svelte-check in watch mode
 
 ## Architecture
 
 ```
 src/
 ├── lib/
-│   ├── api/           # Fetch wrapper + endpoint modules (blocking, query, lists, cache, metrics, sidecar)
-│   ├── stores/        # Svelte 5 rune stores (settings, blocking, toasts, metricsHistory)
+│   ├── api/           # Fetch wrapper + endpoint modules (client, blocking, query, lists, cache, metrics, sidecar-*)
+│   ├── stores/        # Svelte 5 rune stores (settings, blocking, toasts, metrics-history, sidecar, theme, tooltip)
 │   ├── components/
 │   │   ├── layout/    # AppShell, Sidebar, Header
-│   │   ├── ui/        # Reusable primitives (Button, Card, Toggle, Modal, Input, etc.)
-│   │   ├── dashboard/ # BlockingToggle, StatsCard, ConnectionStatus
+│   │   ├── ui/        # Reusable primitives (Button, Card, Toggle, Modal, Input, Select, Spinner, StatusBadge, Toast, EmptyState, etc.)
+│   │   ├── dashboard/ # BlockingToggle, StatsCard, ConnectionStatus, ModeBar, ClientTable, ActivityChart, ResponseBreakdown
 │   │   ├── query/     # QueryForm, QueryResult
-│   │   ├── analytics/ # Charts, LogViewer, CardSkeleton
-│   │   └── settings/  # ApiUrlForm
+│   │   ├── analytics/ # Charts, LogViewer, CardSkeleton, ClientBreakdown, DailyChart, HourlyChart, DistributionChart, TopDomainsTable, DateRangeSelector
+│   │   ├── config/    # ConfigEditor, ServiceControl, YamlEditor
+│   │   └── settings/  # ApiUrlForm, SidecarForm
 │   ├── utils/         # Prometheus metrics parser, formatters
 │   └── types/         # TypeScript interfaces (BlockingStatus, DnsQueryResponse, ParsedMetrics, error classes)
-├── routes/            # 8 pages: / (dashboard), /query, /lists, /cache, /settings,
-│                      #           /analytics, /logs, /config (last 3 require sidecar)
+├── routes/            # 7 pages: / (dashboard w/ analytics), /query, /lists, /cache, /settings,
+│                      #           /logs, /config (last 3 require sidecar)
 └── app.css            # TailwindCSS v4 theme config (@theme block)
 sidecar/               # Optional Go sidecar service
 ├── main.go            # Entry point, chi router setup
 ├── config.go          # Config loading (config.yaml)
 ├── config.example.yaml
-├── handler/           # HTTP handlers (config, service, stats, logs)
-├── logparser/         # Blocky log file parser
+├── handler/           # HTTP handlers (config, health, service, stats, logs, logstream)
+├── logparser/         # Blocky log file parser + stats caching
 ├── blocky/            # Blocky service interaction (systemctl)
+├── resolver/          # DNS host resolution for log entries
 └── middleware/         # Auth (X-API-Key) and CORS middleware
 ```
 
 ## Key Patterns
 
 - **Runtime API URL** — stored in `localStorage` under `blocky-api-url`, configurable in Settings. No rebuild needed to change it. Default: `http://localhost:4000`
-- **Sidecar URL** — also in `localStorage`, configured in Settings. Unlocks Analytics, Logs, Config pages in the sidebar when set
+- **Sidecar URL** — also in `localStorage`, configured in Settings. Unlocks Logs, Config pages in the sidebar when set
 - **Stores** use Svelte 5 runes (`$state` + getters/setters), not legacy Svelte stores
 - **Polling** — blocking status polls every N seconds (default 5), metrics every 30s. Pauses when tab is hidden via `document.hidden`
 - **Metrics history** — `metricsHistoryStore` keeps an in-memory rolling history of metric snapshots for the Query Activity chart
@@ -83,6 +86,7 @@ Go sidecar (default port 8550), all authenticated routes require `X-API-Key` hea
 - `GET /api/stats?range=today|yesterday|7d|30d` — aggregated query analytics from log files
 - `GET /api/stats/timeline?range=...&interval=5m|15m|1h` — time-bucketed query timeline
 - `GET /api/logs?range=...&limit=...&offset=...&client=...&domain=...&type=...` — paginated, filtered log entries
+- `GET /api/logs/stream` — SSE stream of live log entries (with host resolution)
 
 ## Blocky Prometheus Metrics
 
@@ -100,5 +104,5 @@ Metric names used by the parser (Blocky v0.28):
 - Form inputs use `$bindable()` for two-way binding
 - Confirmation modals for destructive actions (disable blocking, refresh lists, flush cache)
 - Toast notifications via `toastStore` for action feedback
-- Sidebar conditionally shows Analytics/Logs/Config links only when sidecar is configured
+- Sidebar conditionally shows Logs/Config links only when sidecar is configured
 - Loading skeletons (`CardSkeleton`) used on analytics page while data loads
