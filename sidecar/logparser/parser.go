@@ -31,7 +31,7 @@ func ParseLine(line string) (*LogEntry, error) {
 		return nil, fmt.Errorf("expected 11 tab-separated fields, got %d", len(fields))
 	}
 
-	ts, err := time.Parse("2006-01-02 15:04:05", fields[0])
+	ts, err := time.ParseInLocation("2006-01-02 15:04:05", fields[0], time.Local)
 	if err != nil {
 		return nil, fmt.Errorf("parse timestamp: %w", err)
 	}
