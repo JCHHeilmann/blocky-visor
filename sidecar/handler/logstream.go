@@ -7,13 +7,24 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/JCHHeilmann/blocky-visor/sidecar/logparser"
 	"github.com/JCHHeilmann/blocky-visor/sidecar/resolver"
 )
+
+// fileTracker holds the offset for a tailed log file.
+type fileTracker struct {
+	path   string
+	offset int64
+}
+
+// todayLogFiles returns the log file paths for today's date using LogFilesForDate.
+func todayLogFiles(logDir string) []string {
+	return logparser.LogFilesForDate(logDir, time.Now())
+}
 
 func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -38,13 +49,19 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 		ctx := r.Context()
 
 		currentDate := time.Now().Format("2006-01-02")
-		logPath := filepath.Join(logDir, currentDate+"_ALL.log")
+		logPaths := todayLogFiles(logDir)
 
 		// Send recent historical entries on connect
 		const backfillCount = 50
-		var fileOffset int64
-		if f, err := os.Open(logPath); err == nil {
-			var allFiltered []*logparser.LogEntry
+		var allFiltered []*logparser.LogEntry
+
+		// Build initial trackers (one per file) and read existing entries
+		trackers := make([]fileTracker, 0, len(logPaths))
+		for _, logPath := range logPaths {
+			f, err := os.Open(logPath)
+			if err != nil {
+				continue
+			}
 			scanner := bufio.NewScanner(f)
 			scanner.Buffer(make([]byte, 0, 1024*1024), 1024*1024)
 			for scanner.Scan() {
@@ -63,22 +80,27 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 					allFiltered = append(allFiltered, entry)
 				}
 			}
-			// Take last N entries, send as a single "backfill" event
-			start := 0
-			if len(allFiltered) > backfillCount {
-				start = len(allFiltered) - backfillCount
-			}
-			if len(allFiltered[start:]) > 0 {
-				data, _ := json.Marshal(allFiltered[start:])
-				fmt.Fprintf(w, "event: backfill\ndata: %s\n\n", data)
-				flusher.Flush()
-			}
-
 			info, _ := f.Stat()
+			var offset int64
 			if info != nil {
-				fileOffset = info.Size()
+				offset = info.Size()
 			}
 			f.Close()
+			trackers = append(trackers, fileTracker{path: logPath, offset: offset})
+		}
+
+		// Sort by timestamp and send last N as backfill
+		sort.Slice(allFiltered, func(i, j int) bool {
+			return allFiltered[i].Timestamp.Before(allFiltered[j].Timestamp)
+		})
+		start := 0
+		if len(allFiltered) > backfillCount {
+			start = len(allFiltered) - backfillCount
+		}
+		if len(allFiltered[start:]) > 0 {
+			data, _ := json.Marshal(allFiltered[start:])
+			fmt.Fprintf(w, "event: backfill\ndata: %s\n\n", data)
+			flusher.Flush()
 		}
 
 		ticker := time.NewTicker(500 * time.Millisecond)
@@ -93,70 +115,94 @@ func StreamLogs(logDir string, hr *resolver.HostResolver) http.HandlerFunc {
 				newDate := time.Now().Format("2006-01-02")
 				if newDate != currentDate {
 					currentDate = newDate
-					logPath = filepath.Join(logDir, currentDate+"_ALL.log")
-					fileOffset = 0
-				}
-
-				f, err := os.Open(logPath)
-				if err != nil {
-					continue
-				}
-
-				info, err := f.Stat()
-				if err != nil {
-					f.Close()
-					continue
-				}
-
-				// File was truncated or rotated
-				if info.Size() < fileOffset {
-					fileOffset = 0
-				}
-
-				if info.Size() <= fileOffset {
-					f.Close()
-					continue
-				}
-
-				if _, err := f.Seek(fileOffset, io.SeekStart); err != nil {
-					f.Close()
-					continue
-				}
-
-				buf := make([]byte, info.Size()-fileOffset)
-				n, err := f.Read(buf)
-				f.Close()
-				if err != nil && err != io.EOF {
-					continue
-				}
-				fileOffset += int64(n)
-
-				// Parse lines from the chunk
-				lines := splitLines(buf[:n])
-				for _, line := range lines {
-					if line == "" {
-						continue
+					logPaths = todayLogFiles(logDir)
+					trackers = make([]fileTracker, 0, len(logPaths))
+					for _, p := range logPaths {
+						trackers = append(trackers, fileTracker{path: p, offset: 0})
 					}
-					entry, err := logparser.ParseLine(line)
-					if err != nil {
-						continue
+				}
+
+				// Check for new per-client files that appeared since last tick
+				currentPaths := todayLogFiles(logDir)
+				knownPaths := make(map[string]bool, len(trackers))
+				for _, t := range trackers {
+					knownPaths[t.path] = true
+				}
+				for _, p := range currentPaths {
+					if !knownPaths[p] {
+						trackers = append(trackers, fileTracker{path: p, offset: 0})
 					}
-					if name := hr.Lookup(entry.ClientIP); name != "" {
-						entry.ResolvedName = name
+				}
+
+				// Poll each tracked file for new data
+				for i := range trackers {
+					entries := pollFile(&trackers[i], hr, filter)
+					for _, entry := range entries {
+						data, err := json.Marshal(entry)
+						if err != nil {
+							continue
+						}
+						fmt.Fprintf(w, "data: %s\n\n", data)
 					}
-					if !logparser.MatchesFilter(entry, filter) {
-						continue
-					}
-					data, err := json.Marshal(entry)
-					if err != nil {
-						continue
-					}
-					fmt.Fprintf(w, "data: %s\n\n", data)
 				}
 				flusher.Flush()
 			}
 		}
 	}
+}
+
+// pollFile reads new data from a single tracked file and returns matching entries.
+func pollFile(t *fileTracker, hr *resolver.HostResolver, filter logparser.LogFilter) []*logparser.LogEntry {
+	f, err := os.Open(t.path)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil
+	}
+
+	// File was truncated or rotated
+	if info.Size() < t.offset {
+		t.offset = 0
+	}
+
+	if info.Size() <= t.offset {
+		return nil
+	}
+
+	if _, err := f.Seek(t.offset, io.SeekStart); err != nil {
+		return nil
+	}
+
+	buf := make([]byte, info.Size()-t.offset)
+	n, err := f.Read(buf)
+	if err != nil && err != io.EOF {
+		return nil
+	}
+	t.offset += int64(n)
+
+	var entries []*logparser.LogEntry
+	lines := splitLines(buf[:n])
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		entry, err := logparser.ParseLine(line)
+		if err != nil {
+			continue
+		}
+		if name := hr.Lookup(entry.ClientIP); name != "" {
+			entry.ResolvedName = name
+		}
+		if !logparser.MatchesFilter(entry, filter) {
+			continue
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }
 
 func splitLines(data []byte) []string {

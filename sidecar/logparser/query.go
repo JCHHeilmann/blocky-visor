@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -51,15 +52,37 @@ func ParseFile(path string) ([]*LogEntry, error) {
 	return entries, scanner.Err()
 }
 
+// LogFilesForDate returns all log files for a given date.
+// Supports both Blocky csv format (DATE_ALL.log) and csv-client format (DATE_CLIENT.log).
+// If a _ALL.log file exists, only that file is returned.
+// Otherwise, all per-client files matching the date prefix are returned.
+func LogFilesForDate(logDir string, date time.Time) []string {
+	dateStr := date.Format("2006-01-02")
+
+	// Prefer _ALL.log (csv mode)
+	allPath := filepath.Join(logDir, dateStr+"_ALL.log")
+	if _, err := os.Stat(allPath); err == nil {
+		return []string{allPath}
+	}
+
+	// Fall back to per-client files (csv-client mode)
+	pattern := filepath.Join(logDir, dateStr+"_*.log")
+	matches, err := filepath.Glob(pattern)
+	if err != nil || len(matches) == 0 {
+		return nil
+	}
+
+	// Sort for deterministic ordering
+	sort.Strings(matches)
+	return matches
+}
+
 // LogFilesForRange returns the log file paths for dates within the given range.
+// Supports both Blocky csv format (DATE_ALL.log) and csv-client format (DATE_CLIENT.log).
 func LogFilesForRange(logDir string, start, end time.Time) []string {
 	var files []string
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-		name := fmt.Sprintf("%s_ALL.log", d.Format("2006-01-02"))
-		path := filepath.Join(logDir, name)
-		if _, err := os.Stat(path); err == nil {
-			files = append(files, path)
-		}
+		files = append(files, LogFilesForDate(logDir, d)...)
 	}
 	return files
 }
