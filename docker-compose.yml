@@ -1,0 +1,18 @@
+services:
+  frontend:
+    build: .
+    ports:
+      - "80:80"
+    restart: unless-stopped
+
+  sidecar:
+    build: ./sidecar
+    ports:
+      - "8550:8550"
+    volumes:
+      # Mount your sidecar config (copy config.example.yaml → config.yaml and edit it)
+      - ./sidecar/config.yaml:/etc/blocky-visor/config.yaml:ro
+      # Mount Blocky's log directory and config file (read-only)
+      - /opt/blocky/logs:/opt/blocky/logs:ro
+      - /opt/blocky/config.yml:/opt/blocky/config.yml:ro
+    restart: unless-stopped

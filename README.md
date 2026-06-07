@@ -84,7 +84,38 @@ blocky-visor.local {
 }
 ```
 
-### Option 2: Dev Server as Preview
+### Option 2: Docker
+
+Docker images are built locally — no pre-built image is required.
+
+**Frontend only:**
+
+```bash
+docker build -t blocky-visor .
+docker run -p 80:80 blocky-visor
+```
+
+Open `http://localhost` and enter your Blocky API URL in **Settings**.
+
+**Frontend + Sidecar (Docker Compose):**
+
+```bash
+# Copy and edit the sidecar config
+cp sidecar/config.example.yaml sidecar/config.yaml
+# Edit sidecar/config.yaml — set api_key, cors_origins, and blocky paths
+
+docker compose up -d
+```
+
+This starts:
+- **Frontend** on port `80` — the Blocky Visor SPA
+- **Sidecar** on port `8550` — analytics, logs, and config editor
+
+The sidecar container mounts `/opt/blocky/logs` and `/opt/blocky/config.yml` from the host (read-only by default). Adjust the `volumes` section in `docker-compose.yml` if your Blocky installation is in a different path.
+
+> **Note:** The sidecar's service restart/status features require systemd and will not function inside a Docker container. All other sidecar features (analytics, logs, config editing) work normally.
+
+### Option 3: Dev Server as Preview
 
 ```bash
 npm run build
